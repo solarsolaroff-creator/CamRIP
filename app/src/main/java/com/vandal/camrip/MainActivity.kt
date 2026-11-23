@@ -30,6 +30,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -72,10 +73,24 @@ enum class GlitchEffect(val title: String) {
     SCAN("Scanlines"),
     WAVE("Wave"),
     INVERT("Invert Pulse"),
-    NOISE("Noise Storm")
+    NOISE("Noise Storm"),
+    SHAKE("Shake"),
+    ZOOM_PULSE("Zoom Pulse"),
+    CHROMA("Chroma"),
+    BLUR_PULSE("Blur Pulse"),
+    EXPOSURE("Exposure")
 }
 
-data class Keyframe(val timeSec: Float, val intensity: Float) // intensity 0..1
+enum class Easing(val title: String) {
+    LINEAR("Линейно"),
+    EASE_IN("Плавно вх."),
+    EASE_OUT("Плавно вых."),
+    EASE_IN_OUT("Плавно"),
+    STEP("Ступени"),
+    WAVE("Волна")
+}
+
+data class Keyframe(val timeSec: Float, val intensity: Float, val easing: Easing = Easing.LINEAR) // intensity 0..1
 
 enum class M3Shape(val title: String) {
     CIRCLE("Circle"), SQUARE("Square"), PILL("Pill"), ARCH("Arch"), DIAMOND("Diamond"),
@@ -100,11 +115,20 @@ fun CamRipApp() {
     var keyframes by remember { mutableStateOf(listOf(Keyframe(0f, 1f), Keyframe(10f, 1f))) }
     var selectedKf by remember { mutableStateOf(0) }
 
-    // Vector pen
+    // Vector pen / object
     var points by remember { mutableStateOf(listOf<Offset>()) }
     var selectedPoint by remember { mutableStateOf(-1) }
     var shapeClosed by remember { mutableStateOf(false) }
     var selectedShape by remember { mutableStateOf<M3Shape?>(null) }
+    var objX by remember { mutableStateOf(0f) }
+    var objY by remember { mutableStateOf(0f) }
+    var objScale by remember { mutableStateOf(1f) }
+    var objRotation by remember { mutableStateOf(0f) }
+    var objColor by remember { mutableStateOf(Color(0xFF7CFFB2)) }
+
+    // Subtitles
+    var subtitleText by remember { mutableStateOf("") }
+    var subtitleIsSpeech by remember { mutableStateOf(true) }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
@@ -151,12 +175,12 @@ fun CamRipApp() {
             // Keyframes
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Keyframes (интенсивность эффекта)", fontWeight = FontWeight.SemiBold)
+                    Text("Keyframes / Кривые", fontWeight = FontWeight.SemiBold)
                     Text("Выбранный keyframe: #${selectedKf + 1} / ${keyframes.size}")
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = {
                             val t = ((trimRange.start + trimRange.endInclusive) / 2f)
-                            keyframes = (keyframes + Keyframe(t, 1f)).sortedBy { it.timeSec }
+                            keyframes = (keyframes + Keyframe(t, 1f, Easing.LINEAR)).sortedBy { it.timeSec }
                             selectedKf = keyframes.indexOfLast { it.timeSec <= t }.coerceAtLeast(0)
                         }, enabled = !exporting) { Text("+ Keyframe") }
                         Button(onClick = {
@@ -176,6 +200,14 @@ fun CamRipApp() {
                         Slider(value = kf.intensity, onValueChange = { v ->
                             keyframes = keyframes.toMutableList().also { it[selectedKf] = it[selectedKf].copy(intensity = v) }
                         }, enabled = !exporting)
+                        Text("Кривая (easing) до следующей точки", color = Color(0xFFB0B0C0))
+                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Easing.entries.forEach { e ->
+                                FilterChip(selected = kf.easing == e, onClick = {
+                                    keyframes = keyframes.toMutableList().also { it[selectedKf] = it[selectedKf].copy(easing = e) }
+                                }, label = { Text(e.title) }, enabled = !exporting)
+                            }
+                        }
                     }
                 }
             }
@@ -200,6 +232,7 @@ fun CamRipApp() {
                         points = points,
                         selected = selectedPoint,
                         closed = shapeClosed,
+                        color = objColor,
                         onSelect = { selectedPoint = it },
                         onMove = { idx, pos -> points = points.toMutableList().also { it[idx] = pos } },
                         onAdd = { pos -> points = points + pos; selectedPoint = points.lastIndex }
@@ -219,10 +252,58 @@ fun CamRipApp() {
                     Box(Modifier.fillMaxWidth().height(180.dp).background(Color(0xFF0E0E14), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
                         val shape = selectedShape
                         if (shape != null) {
-                            Canvas(Modifier.size(140.dp)) { drawM3Shape(shape, Color(0xFF7CFFB2), Color(0x44FF4FD8)) }
+                            Canvas(Modifier.size(140.dp)) {
+                                withTransform({
+                                    translate(left = objX, top = objY)
+                                    rotate(objRotation, pivot = center)
+                                    scale(objScale, objScale, pivot = center)
+                                }) {
+                                    drawM3Shape(shape, objColor, objColor.copy(alpha = 0.25f))
+                                }
+                            }
                         } else {
                             Text("Выберите фигуру", color = Color(0xFF8888AA))
                         }
+                    }
+                }
+            }
+
+            // Transform & color
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Объект: перемещение / масштаб / поворот / цвет", fontWeight = FontWeight.SemiBold)
+                    Text("X: ${objX.roundToInt()}  Y: ${objY.roundToInt()}")
+                    Slider(value = objX, onValueChange = { objX = it }, valueRange = -300f..300f, enabled = !exporting)
+                    Slider(value = objY, onValueChange = { objY = it }, valueRange = -300f..300f, enabled = !exporting)
+                    Text("Масштаб: ${String.format("%.2f", objScale)}x")
+                    Slider(value = objScale, onValueChange = { objScale = it }, valueRange = 0.2f..3f, enabled = !exporting)
+                    Text("Поворот: ${objRotation.roundToInt()}°")
+                    Slider(value = objRotation, onValueChange = { objRotation = it }, valueRange = -720f..720f, enabled = !exporting)
+                    Text("Цвет", color = Color(0xFFB0B0C0))
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(
+                            "Зелёный" to Color(0xFF7CFFB2), "Розовый" to Color(0xFFFF4FD8),
+                            "Синий" to Color(0xFF7AA2FF), "Белый" to Color(0xFFFFFFFF),
+                            "Жёлтый" to Color(0xFFFFE066), "Красный" to Color(0xFFFF5A5A)
+                        ).forEach { (name, c) ->
+                            FilterChip(selected = objColor == c, onClick = { objColor = c }, label = { Text(name) }, enabled = !exporting)
+                        }
+                    }
+                }
+            }
+
+            // Subtitles
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Субтитры", fontWeight = FontWeight.SemiBold)
+                    OutlinedTextField(value = subtitleText, onValueChange = { subtitleText = it }, label = { Text("Текст субтитра") }, modifier = Modifier.fillMaxWidth(), enabled = !exporting)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = subtitleIsSpeech, onClick = { subtitleIsSpeech = true }, label = { Text("Речь [- текст]") }, enabled = !exporting)
+                        FilterChip(selected = !subtitleIsSpeech, onClick = { subtitleIsSpeech = false }, label = { Text("Обычный [текст]") }, enabled = !exporting)
+                    }
+                    if (subtitleText.isNotBlank()) {
+                        val preview = if (subtitleIsSpeech) "[- $subtitleText]" else "[$subtitleText]"
+                        Text("Превью: $preview", color = Color(0xFFB0B0C0))
                     }
                 }
             }
@@ -231,7 +312,8 @@ fun CamRipApp() {
                 onClick = {
                     val uri = videoUri ?: return@Button
                     exporting = true; progress = 0f; status = "Рендеринг..."
-                    exportVideo(context, uri, trimRange.start.toDouble(), trimRange.endInclusive.toDouble(), effect, keyframes,
+                    val sub = subtitleText.trim().let { if (it.isBlank()) "" else if (subtitleIsSpeech) "[- $it]" else "[$it]" }
+                    exportVideo(context, uri, trimRange.start.toDouble(), trimRange.endInclusive.toDouble(), effect, keyframes, sub,
                         onProgress = { p -> progress = p },
                         onDone = { _, msg -> exporting = false; status = msg; Toast.makeText(context, msg, Toast.LENGTH_LONG).show() }
                     )
@@ -253,7 +335,7 @@ fun CamRipApp() {
 }
 
 @Composable
-fun VectorCanvas(points: List<Offset>, selected: Int, closed: Boolean, onSelect: (Int) -> Unit, onMove: (Int, Offset) -> Unit, onAdd: (Offset) -> Unit) {
+fun VectorCanvas(points: List<Offset>, selected: Int, closed: Boolean, color: Color, onSelect: (Int) -> Unit, onMove: (Int, Offset) -> Unit, onAdd: (Offset) -> Unit) {
     Box(Modifier.fillMaxWidth().height(260.dp).background(Color(0xFF0E0E14), RoundedCornerShape(12.dp))) {
         Canvas(Modifier.fillMaxSize()
             .pointerInput(points, selected, closed) {
@@ -279,11 +361,11 @@ fun VectorCanvas(points: List<Offset>, selected: Int, closed: Boolean, onSelect:
                     for (i in 1 until points.size) lineTo(points[i].x, points[i].y)
                     if (closed && points.size >= 3) close()
                 }
-                drawPath(path, Color(0xFF7AA2FF), style = Stroke(width = 4f))
-                if (closed && points.size >= 3) drawPath(path, Color(0x227AA2FF))
+                drawPath(path, color, style = Stroke(width = 4f))
+                if (closed && points.size >= 3) drawPath(path, color.copy(alpha = 0.15f))
             }
             points.forEachIndexed { i, p ->
-                drawCircle(if (i == selected) Color(0xFFFF4FD8) else Color(0xFF7CFFB2), radius = 12f, center = p)
+                drawCircle(if (i == selected) Color(0xFFFF4FD8) else color, radius = 12f, center = p)
                 drawCircle(Color.White, radius = 4f, center = p)
             }
         }
@@ -356,20 +438,27 @@ fun queryDuration(context: Context, uri: Uri): Long = try {
 fun intensityExpr(kfs: List<Keyframe>, base: Double): String {
     if (kfs.isEmpty()) return base.toString()
     if (kfs.size == 1) return (base * kfs[0].intensity).toString()
-    // piecewise linear approximation as nested if
     val sorted = kfs.sortedBy { it.timeSec }
     var expr = "${base * sorted.last().intensity}"
     for (i in sorted.size - 2 downTo 0) {
-        val a = sorted[i]; val b = sorted[i+1]
+        val a = sorted[i]; val b = sorted[i + 1]
         val dt = (b.timeSec - a.timeSec).coerceAtLeast(0.001f)
-        val m = (b.intensity - a.intensity) / dt
-        val v = "$base*(${a.intensity}+${m}*(t-${a.timeSec}))"
+        val p = "((t-${a.timeSec})/$dt)"
+        val eased = when (a.easing) {
+            Easing.LINEAR -> p
+            Easing.EASE_IN -> "($p*$p)"
+            Easing.EASE_OUT -> "(1-(1-$p)*(1-$p))"
+            Easing.EASE_IN_OUT -> "($p*$p*(3-2*$p))"
+            Easing.STEP -> "0"
+            Easing.WAVE -> "(0.5-0.5*cos(PI*$p))"
+        }
+        val v = "$base*(${a.intensity}+(${b.intensity}-${a.intensity})*$eased)"
         expr = "if(between(t,${a.timeSec},${b.timeSec}),$v,$expr)"
     }
     return "if(lt(t,${sorted.first().timeSec}),${base * sorted.first().intensity},$expr)"
 }
 
-fun exportVideo(context: Context, uri: Uri, startSec: Double, endSec: Double, effect: GlitchEffect, kfs: List<Keyframe>, onProgress: (Float) -> Unit, onDone: (Boolean, String) -> Unit) {
+fun exportVideo(context: Context, uri: Uri, startSec: Double, endSec: Double, effect: GlitchEffect, kfs: List<Keyframe>, subtitle: String, onProgress: (Float) -> Unit, onDone: (Boolean, String) -> Unit) {
     val input = copyUriToCache(context, uri) ?: run { onDone(false, "Не удалось прочитать видео"); return }
     val outFile = File(context.cacheDir, "camrip_${System.currentTimeMillis()}.mp4")
     val dur = max(0.5, endSec - startSec)
@@ -383,8 +472,24 @@ fun exportVideo(context: Context, uri: Uri, startSec: Double, endSec: Double, ef
         GlitchEffect.WAVE -> "geq=lum='lum(X+10*sin(2*PI*Y/80+T*3)*${amp},Y)':cb='cb(X,Y)':cr='cr(X,Y)'"
         GlitchEffect.INVERT -> "lutrgb=r='if(mod(floor(T*4*${amp}),2),255-val,val)':g='if(mod(floor(T*4*${amp}),2),255-val,val)':b='if(mod(floor(T*4*${amp}),2),255-val,val)'"
         GlitchEffect.NOISE -> "noise=alls='60*${amp}':allf=t+u,eq=contrast='1+0.4*${amp}'"
+        GlitchEffect.SHAKE -> "crop=iw-40:ih-40:'20+10*sin(t*30)*${amp}':'20+10*cos(t*25)*${amp}'"
+        GlitchEffect.ZOOM_PULSE -> "scale=iw*(1+0.08*sin(t*6)*${amp}):ih*(1+0.08*sin(t*6)*${amp}),crop=iw:ih"
+        GlitchEffect.CHROMA -> "rgbashift=rh='12*${amp}':gh='-8*${amp}':bh='6*${amp}',eq=saturation='1+0.3*${amp}'"
+        GlitchEffect.BLUR_PULSE -> "boxblur=luma_radius='min(20,2+10*abs(sin(t*3))*${amp})':luma_power=1"
+        GlitchEffect.EXPOSURE -> "eq=brightness='0.08*sin(t*4)*${amp}':contrast='1+0.15*${amp}'"
     }
-    val cmd = "-y -ss $startSec -t $dur -i ${quote(input.absolutePath)} -vf ${quote(filter)} -map 0:v:0 -map 0:a? -c:v mpeg4 -q:v 3 -c:a aac -b:a 128k ${quote(outFile.absolutePath)}"
+    val vf = if (subtitle.isBlank()) filter else {
+        val escaped = subtitle
+            .replace("\\", "\\\\")
+            .replace(":", "\\:")
+            .replace("'", "\\'")
+            .replace("[", "\\[")
+            .replace("]", "\\]")
+            .replace(",", "\\,")
+            .replace(";", "\\;")
+        "$filter,drawtext=text='$escaped':fontfile=/system/fonts/Roboto-Regular.ttf:fontsize=36:fontcolor=white:borderw=2:bordercolor=black:x=(w-text_w)/2:y=h-th-40"
+    }
+    val cmd = "-y -ss $startSec -t $dur -i ${quote(input.absolutePath)} -vf ${quote(vf)} -map 0:v:0 -map 0:a? -c:v mpeg4 -q:v 3 -c:a aac -b:a 128k ${quote(outFile.absolutePath)}"
 
     FFmpegKitConfig.enableStatisticsCallback { stat -> onProgress((stat.time / (dur * 1000.0)).toFloat().coerceIn(0f, 1f)) }
     FFmpegKit.executeAsync(cmd) { session ->
