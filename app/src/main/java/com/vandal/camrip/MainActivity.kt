@@ -96,8 +96,22 @@ enum class M3Shape(val title: String) {
     CIRCLE("Circle"), SQUARE("Square"), PILL("Pill"), ARCH("Arch"), DIAMOND("Diamond"),
     PENTAGON("Pentagon"), CLOVER4("Clover4"), CLOVER8("Clover8"), BURST("Burst"),
     SOFT_BURST("SoftBurst"), FLOWER("Flower"), COOKIE6("Cookie6"), COOKIE12("Cookie12"),
-    BOOM("Boom"), SOFT_BOOM("SoftBoom"), PUFFY("Puffy"), BUN("Bun")
+    BOOM("Boom"), SOFT_BOOM("SoftBoom"), PUFFY("Puffy"), BUN("Bun"), WAVY("Wavy"), BLOB("Blob")
 }
+
+data class TimelineItem(
+    val id: Long = System.currentTimeMillis(),
+    val type: String, // video, shape, text, audio, vector, media
+    val label: String,
+    val startSec: Float = 0f,
+    val durationSec: Float = 3f,
+    var x: Float = 0f,
+    var y: Float = 0f,
+    var scale: Float = 1f,
+    var rotation: Float = 0f,
+    var color: Color = Color(0xFF7CFFB2),
+    var shape: M3Shape? = null
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -110,25 +124,23 @@ fun CamRipApp() {
     var exporting by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf(0f) }
     var status by remember { mutableStateOf("Выберите видео для начала") }
+    var playhead by remember { mutableStateOf(0f) }
 
-    // Keyframes
     var keyframes by remember { mutableStateOf(listOf(Keyframe(0f, 1f), Keyframe(10f, 1f))) }
     var selectedKf by remember { mutableStateOf(0) }
-
-    // Vector pen / object
     var points by remember { mutableStateOf(listOf<Offset>()) }
     var selectedPoint by remember { mutableStateOf(-1) }
     var shapeClosed by remember { mutableStateOf(false) }
     var selectedShape by remember { mutableStateOf<M3Shape?>(null) }
-    var objX by remember { mutableStateOf(0f) }
-    var objY by remember { mutableStateOf(0f) }
-    var objScale by remember { mutableStateOf(1f) }
-    var objRotation by remember { mutableStateOf(0f) }
     var objColor by remember { mutableStateOf(Color(0xFF7CFFB2)) }
 
-    // Subtitles
     var subtitleText by remember { mutableStateOf("") }
     var subtitleIsSpeech by remember { mutableStateOf(true) }
+
+    val tabs = listOf("Видео", "Медиа", "Аудио", "Фигуры", "Вектор")
+    var selectedTab by remember { mutableStateOf(0) }
+    var items by remember { mutableStateOf(listOf<TimelineItem>()) }
+    var selectedItemId by remember { mutableStateOf<Long?>(null) }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
@@ -139,160 +151,146 @@ fun CamRipApp() {
             trimRange = 0f..sec
             keyframes = listOf(Keyframe(0f, 1f), Keyframe(sec, 1f))
             selectedKf = 0
-            status = "Видео загружено. Настройте эффекты, keyframes и фигуры."
+            playhead = 0f
+            status = "Видео загружено"
+            if (items.none { it.type == "video" }) {
+                items = listOf(TimelineItem(type = "video", label = "Видео", startSec = 0f, durationSec = sec)) + items
+            }
         }
     }
 
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Text("CamRIP", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-        Text("Глич-монтаж, keyframes и векторные фигуры", color = Color(0xFFB0B0C0))
+    val selectedItem = items.firstOrNull { it.id == selectedItemId }
 
-        Button(onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)) }, enabled = !exporting) {
-            Text(if (videoUri == null) "Выбрать видео" else "Выбрать другое видео")
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        ScrollableTabRow(selectedTabIndex = selectedTab, containerColor = MaterialTheme.colorScheme.surface, edgePadding = 8.dp) {
+            tabs.forEachIndexed { i, t ->
+                Tab(selected = selectedTab == i, onClick = { selectedTab = i }, text = { Text(t) })
+            }
         }
 
-        if (videoUri != null) {
-            VideoPreview(uri = videoUri!!)
-
-            Text("Обрезка: ${trimRange.start.format1()}s — ${trimRange.endInclusive.format1()}s")
-            RangeSlider(
-                value = trimRange,
-                onValueChange = { trimRange = it },
-                valueRange = 0f..(durationMs / 1000f),
-                enabled = !exporting
-            )
-
-            Text("Глич-эффекты", fontWeight = FontWeight.SemiBold)
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                GlitchEffect.entries.forEach { e ->
-                    FilterChip(selected = effect == e, onClick = { effect = e }, label = { Text(e.title) }, enabled = !exporting)
+        Column(
+            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            if (videoUri != null) {
+                VideoPreview(uri = videoUri!!)
+            } else {
+                Box(Modifier.fillMaxWidth().height(220.dp).background(Color(0xFF101018), RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
+                    Text("Превью видео", color = Color(0xFF8888AA))
                 }
             }
 
-            // Keyframes
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Keyframes / Кривые", fontWeight = FontWeight.SemiBold)
-                    Text("Выбранный keyframe: #${selectedKf + 1} / ${keyframes.size}")
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = {
-                            val t = ((trimRange.start + trimRange.endInclusive) / 2f)
-                            keyframes = (keyframes + Keyframe(t, 1f, Easing.LINEAR)).sortedBy { it.timeSec }
-                            selectedKf = keyframes.indexOfLast { it.timeSec <= t }.coerceAtLeast(0)
-                        }, enabled = !exporting) { Text("+ Keyframe") }
-                        Button(onClick = {
-                            if (keyframes.size > 2) {
-                                keyframes = keyframes.toMutableList().also { it.removeAt(selectedKf.coerceIn(0, it.lastIndex)) }
-                                selectedKf = selectedKf.coerceAtMost(keyframes.lastIndex)
-                            }
-                        }, enabled = !exporting && keyframes.size > 2) { Text("Удалить") }
-                    }
-                    if (keyframes.isNotEmpty()) {
-                        val kf = keyframes[selectedKf.coerceIn(0, keyframes.lastIndex)]
-                        Text("Время: ${kf.timeSec.format1()}s")
-                        Slider(value = kf.timeSec, onValueChange = { v ->
-                            keyframes = keyframes.toMutableList().also { it[selectedKf] = it[selectedKf].copy(timeSec = v) }.sortedBy { it.timeSec }
-                        }, valueRange = trimRange.start..trimRange.endInclusive, enabled = !exporting)
-                        Text("Интенсивность: ${(kf.intensity * 100).roundToInt()}%")
-                        Slider(value = kf.intensity, onValueChange = { v ->
-                            keyframes = keyframes.toMutableList().also { it[selectedKf] = it[selectedKf].copy(intensity = v) }
-                        }, enabled = !exporting)
-                        Text("Кривая (easing) до следующей точки", color = Color(0xFFB0B0C0))
-                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Easing.entries.forEach { e ->
-                                FilterChip(selected = kf.easing == e, onClick = {
-                                    keyframes = keyframes.toMutableList().also { it[selectedKf] = it[selectedKf].copy(easing = e) }
-                                }, label = { Text(e.title) }, enabled = !exporting)
-                            }
+            when (selectedTab) {
+                0 -> {
+                    Text("Видео дорожка / монтаж", fontWeight = FontWeight.SemiBold)
+                    Text("Обрезка: ${trimRange.start.format1()}s — ${trimRange.endInclusive.format1()}s")
+                    RangeSlider(value = trimRange, onValueChange = { trimRange = it }, valueRange = 0f..(durationMs / 1000f), enabled = !exporting)
+                    Text("Эффект", fontWeight = FontWeight.SemiBold)
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        GlitchEffect.entries.forEach { e ->
+                            FilterChip(selected = effect == e, onClick = { effect = e }, label = { Text(e.title) }, enabled = !exporting)
                         }
                     }
                 }
-            }
-
-            // Vector pen
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Векторный карандаш / фигуры", fontWeight = FontWeight.SemiBold)
-                    Text("Тап — добавить/выбрать точку. Перетаскивание — двигать точку.", color = Color(0xFFB0B0C0))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = {
-                            // add point at center-ish
-                            points = points + Offset(200f + points.size * 30f, 200f + (points.size % 3) * 40f)
-                            selectedPoint = points.lastIndex
-                        }, enabled = !exporting) { Text("+ Точка") }
-                        Button(onClick = { shapeClosed = !shapeClosed }, enabled = !exporting && points.size >= 3) {
-                            Text(if (shapeClosed) "Открыть" else "Замкнуть")
-                        }
-                        OutlinedButton(onClick = { points = emptyList(); selectedPoint = -1; shapeClosed = false }, enabled = !exporting) { Text("Очистить") }
-                    }
-                    VectorCanvas(
-                        points = points,
-                        selected = selectedPoint,
-                        closed = shapeClosed,
-                        color = objColor,
-                        onSelect = { selectedPoint = it },
-                        onMove = { idx, pos -> points = points.toMutableList().also { it[idx] = pos } },
-                        onAdd = { pos -> points = points + pos; selectedPoint = points.lastIndex }
-                    )
+                1 -> {
+                    Text("Медиа", fontWeight = FontWeight.SemiBold)
+                    Text("Добавьте видео/картинки через + внизу. (Импорт медиа можно расширить)", color = Color(0xFFB0B0C0))
+                    Button(onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)) }, enabled = !exporting) { Text("Выбрать видео") }
                 }
-            }
-
-            // M3 shapes
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("M3 Expressive Shapes", fontWeight = FontWeight.SemiBold)
+                2 -> {
+                    Text("Аудио", fontWeight = FontWeight.SemiBold)
+                    Text("Аудио-дорожка: скоро. Пока используется звук исходного видео.", color = Color(0xFFB0B0C0))
+                }
+                3 -> {
+                    Text("Фигуры", fontWeight = FontWeight.SemiBold)
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         M3Shape.entries.forEach { s ->
-                            FilterChip(selected = selectedShape == s, onClick = { selectedShape = if (selectedShape == s) null else s }, label = { Text(s.title) })
+                            FilterChip(selected = selectedShape == s, onClick = {
+                                selectedShape = s
+                                val newItem = TimelineItem(type = "shape", label = s.title, startSec = playhead, shape = s, color = objColor)
+                                items = items + newItem
+                                selectedItemId = newItem.id
+                            }, label = { Text(s.title) })
                         }
                     }
-                    Box(Modifier.fillMaxWidth().height(180.dp).background(Color(0xFF0E0E14), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                    Box(Modifier.fillMaxWidth().height(160.dp).background(Color(0xFF0E0E14), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
                         val shape = selectedShape
-                        if (shape != null) {
-                            Canvas(Modifier.size(140.dp)) {
-                                withTransform({
-                                    translate(left = objX, top = objY)
-                                    rotate(objRotation, pivot = center)
-                                    scale(objScale, objScale, pivot = center)
-                                }) {
-                                    drawM3Shape(shape, objColor, objColor.copy(alpha = 0.25f))
-                                }
+                        if (shape != null) Canvas(Modifier.size(120.dp)) { drawM3Shape(shape, objColor, objColor.copy(alpha = 0.25f)) } else Text("Выберите фигуру", color = Color(0xFF8888AA))
+                    }
+                }
+                4 -> {
+                    Text("Векторный карандаш", fontWeight = FontWeight.SemiBold)
+                    Text("Тап — добавить точку. Перетаскивание — двигать.", color = Color(0xFFB0B0C0))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { points = points + Offset(180f + points.size * 20f, 140f); selectedPoint = points.lastIndex }, enabled = !exporting) { Text("+ Точка") }
+                        Button(onClick = { shapeClosed = !shapeClosed }, enabled = !exporting && points.size >= 3) { Text(if (shapeClosed) "Открыть" else "Замкнуть") }
+                        OutlinedButton(onClick = { points = emptyList(); selectedPoint = -1; shapeClosed = false }, enabled = !exporting) { Text("Очистить") }
+                    }
+                    VectorCanvas(points = points, selected = selectedPoint, closed = shapeClosed, color = objColor,
+                        onSelect = { selectedPoint = it },
+                        onMove = { idx, pos -> points = points.toMutableList().also { it[idx] = pos } },
+                        onAdd = { pos -> points = points + pos; selectedPoint = points.lastIndex })
+                    Button(onClick = {
+                        val newItem = TimelineItem(type = "vector", label = "Вектор", startSec = playhead, color = objColor)
+                        items = items + newItem
+                        selectedItemId = newItem.id
+                    }, enabled = points.isNotEmpty()) { Text("Добавить на таймлайн") }
+                }
+            }
+
+            if (selectedItem != null) {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Свойства: ${selectedItem.label}", fontWeight = FontWeight.SemiBold)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(selected = true, onClick = {}, label = { Text("Переместить") })
+                            FilterChip(selected = false, onClick = { status = "Эффекты объекта: в разработке" }, label = { Text("Эффекты") })
+                        }
+                        Text("X: ${selectedItem.x.roundToInt()}  Y: ${selectedItem.y.roundToInt()}")
+                        Slider(value = selectedItem.x, onValueChange = { v -> items = items.map { if (it.id == selectedItem.id) it.copy(x = v) else it } }, valueRange = -300f..300f)
+                        Slider(value = selectedItem.y, onValueChange = { v -> items = items.map { if (it.id == selectedItem.id) it.copy(y = v) else it } }, valueRange = -300f..300f)
+                        Text("Масштаб: ${String.format("%.2f", selectedItem.scale)}x")
+                        Slider(value = selectedItem.scale, onValueChange = { v -> items = items.map { if (it.id == selectedItem.id) it.copy(scale = v) else it } }, valueRange = 0.2f..3f)
+                        Text("Поворот: ${selectedItem.rotation.roundToInt()}°")
+                        Slider(value = selectedItem.rotation, onValueChange = { v -> items = items.map { if (it.id == selectedItem.id) it.copy(rotation = v) else it } }, valueRange = -720f..720f)
+                        Text("Цвет", color = Color(0xFFB0B0C0))
+                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(Color(0xFF7CFFB2), Color(0xFFFF4FD8), Color(0xFF7AA2FF), Color(0xFFFFFFFF), Color(0xFFFFE066), Color(0xFFFF5A5A)).forEach { c ->
+                                FilterChip(selected = selectedItem.color == c, onClick = {
+                                    objColor = c
+                                    items = items.map { if (it.id == selectedItem.id) it.copy(color = c) else it }
+                                }, label = { Text("●") }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = c.copy(alpha = 0.35f)))
                             }
-                        } else {
-                            Text("Выберите фигуру", color = Color(0xFF8888AA))
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = { items = items.filterNot { it.id == selectedItem.id }; selectedItemId = null }) { Text("Удалить") }
                         }
                     }
                 }
             }
 
-            // Transform & color
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Объект: перемещение / масштаб / поворот / цвет", fontWeight = FontWeight.SemiBold)
-                    Text("X: ${objX.roundToInt()}  Y: ${objY.roundToInt()}")
-                    Slider(value = objX, onValueChange = { objX = it }, valueRange = -300f..300f, enabled = !exporting)
-                    Slider(value = objY, onValueChange = { objY = it }, valueRange = -300f..300f, enabled = !exporting)
-                    Text("Масштаб: ${String.format("%.2f", objScale)}x")
-                    Slider(value = objScale, onValueChange = { objScale = it }, valueRange = 0.2f..3f, enabled = !exporting)
-                    Text("Поворот: ${objRotation.roundToInt()}°")
-                    Slider(value = objRotation, onValueChange = { objRotation = it }, valueRange = -720f..720f, enabled = !exporting)
-                    Text("Цвет", color = Color(0xFFB0B0C0))
-                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(
-                            "Зелёный" to Color(0xFF7CFFB2), "Розовый" to Color(0xFFFF4FD8),
-                            "Синий" to Color(0xFF7AA2FF), "Белый" to Color(0xFFFFFFFF),
-                            "Жёлтый" to Color(0xFFFFE066), "Красный" to Color(0xFFFF5A5A)
-                        ).forEach { (name, c) ->
-                            FilterChip(selected = objColor == c, onClick = { objColor = c }, label = { Text(name) }, enabled = !exporting)
+            if (selectedTab == 0) {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Keyframes / Кривые", fontWeight = FontWeight.SemiBold)
+                        Text("Выбранный: #${selectedKf + 1} / ${keyframes.size}")
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = { val t = playhead.coerceIn(trimRange.start, trimRange.endInclusive); keyframes = (keyframes + Keyframe(t, 1f, Easing.LINEAR)).sortedBy { it.timeSec }; selectedKf = keyframes.indexOfLast { it.timeSec <= t }.coerceAtLeast(0) }, enabled = !exporting) { Text("+ Keyframe") }
+                            Button(onClick = { if (keyframes.size > 2) { keyframes = keyframes.toMutableList().also { it.removeAt(selectedKf.coerceIn(0, it.lastIndex)) }; selectedKf = selectedKf.coerceAtMost(keyframes.lastIndex) } }, enabled = !exporting && keyframes.size > 2) { Text("Удалить") }
+                        }
+                        if (keyframes.isNotEmpty()) {
+                            val kf = keyframes[selectedKf.coerceIn(0, keyframes.lastIndex)]
+                            Text("Время: ${kf.timeSec.format1()}s  Интенсивность: ${(kf.intensity * 100).roundToInt()}%")
+                            Slider(value = kf.timeSec, onValueChange = { v -> keyframes = keyframes.toMutableList().also { it[selectedKf] = it[selectedKf].copy(timeSec = v) }.sortedBy { it.timeSec } }, valueRange = trimRange.start..trimRange.endInclusive, enabled = !exporting)
+                            Slider(value = kf.intensity, onValueChange = { v -> keyframes = keyframes.toMutableList().also { it[selectedKf] = it[selectedKf].copy(intensity = v) } }, enabled = !exporting)
+                            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Easing.entries.forEach { e -> FilterChip(selected = kf.easing == e, onClick = { keyframes = keyframes.toMutableList().also { it[selectedKf] = it[selectedKf].copy(easing = e) } }, label = { Text(e.title) }, enabled = !exporting) }
+                            }
                         }
                     }
                 }
             }
 
-            // Subtitles
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Субтитры", fontWeight = FontWeight.SemiBold)
@@ -301,39 +299,52 @@ fun CamRipApp() {
                         FilterChip(selected = subtitleIsSpeech, onClick = { subtitleIsSpeech = true }, label = { Text("Речь [- текст]") }, enabled = !exporting)
                         FilterChip(selected = !subtitleIsSpeech, onClick = { subtitleIsSpeech = false }, label = { Text("Обычный [текст]") }, enabled = !exporting)
                     }
-                    if (subtitleText.isNotBlank()) {
-                        val preview = if (subtitleIsSpeech) "[- $subtitleText]" else "[$subtitleText]"
-                        Text("Превью: $preview", color = Color(0xFFB0B0C0))
-                    }
                 }
             }
 
-            Button(
-                onClick = {
-                    val uri = videoUri ?: return@Button
-                    exporting = true; progress = 0f; status = "Рендеринг..."
-                    val sub = subtitleText.trim().let { if (it.isBlank()) "" else if (subtitleIsSpeech) "[- $it]" else "[$it]" }
-                    exportVideo(context, uri, trimRange.start.toDouble(), trimRange.endInclusive.toDouble(), effect, keyframes, sub,
-                        onProgress = { p -> progress = p },
-                        onDone = { _, msg -> exporting = false; status = msg; Toast.makeText(context, msg, Toast.LENGTH_LONG).show() }
-                    )
-                },
-                enabled = !exporting,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-            ) { Text("Экспорт в MP4") }
+            Button(onClick = {
+                val uri = videoUri ?: return@Button
+                exporting = true; progress = 0f; status = "Рендеринг..."
+                val sub = subtitleText.trim().let { if (it.isBlank()) "" else if (subtitleIsSpeech) "[- $it]" else "[$it]" }
+                exportVideo(context, uri, trimRange.start.toDouble(), trimRange.endInclusive.toDouble(), effect, keyframes, sub,
+                    onProgress = { p -> progress = p },
+                    onDone = { _, msg -> exporting = false; status = msg; Toast.makeText(context, msg, Toast.LENGTH_LONG).show() })
+            }, enabled = !exporting && videoUri != null, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)) { Text("Экспорт в MP4") }
+
+            if (exporting) {
+                LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                Text("${(progress * 100).roundToInt()}%")
+            }
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), modifier = Modifier.fillMaxWidth()) {
+                Text(status, modifier = Modifier.padding(12.dp), color = Color(0xFFDADAE5))
+            }
         }
 
-        if (exporting) {
-            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
-            Text("${(progress * 100).roundToInt()}%")
-        }
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), modifier = Modifier.fillMaxWidth()) {
-            Text(status, modifier = Modifier.padding(12.dp), color = Color(0xFFDADAE5))
+        // Bottom timeline
+        Surface(tonalElevation = 2.dp, color = MaterialTheme.colorScheme.surface) {
+            Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Таймлайн", fontWeight = FontWeight.SemiBold)
+                    Text("${playhead.format1()}s / ${(durationMs/1000f).format1()}s", color = Color(0xFFB0B0C0))
+                }
+                Slider(value = playhead, onValueChange = { playhead = it }, valueRange = 0f..(durationMs / 1000f))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedButton(onClick = { playhead = (playhead - 10f).coerceAtLeast(0f) }) { Text("-10с") }
+                    OutlinedButton(onClick = { playhead = (playhead + 10f).coerceAtMost(durationMs / 1000f) }) { Text("+10с") }
+                    Button(onClick = {
+                        val it = TimelineItem(type = "shape", label = selectedShape?.title ?: "Фигура", startSec = playhead, shape = selectedShape ?: M3Shape.CIRCLE, color = objColor)
+                        items = items + it; selectedItemId = it.id; selectedTab = 3
+                    }) { Text("+") }
+                }
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items.forEach { item ->
+                        FilterChip(selected = selectedItemId == item.id, onClick = { selectedItemId = if (selectedItemId == item.id) null else item.id }, label = { Text("${item.label} @${item.startSec.format1()}s") })
+                    }
+                }
+            }
         }
     }
 }
-
 @Composable
 fun VectorCanvas(points: List<Offset>, selected: Int, closed: Boolean, color: Color, onSelect: (Int) -> Unit, onMove: (Int, Offset) -> Unit, onAdd: (Offset) -> Unit) {
     Box(Modifier.fillMaxWidth().height(260.dp).background(Color(0xFF0E0E14), RoundedCornerShape(12.dp))) {
@@ -413,6 +424,24 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.drawM3Shape(shape: M3Shape,
         M3Shape.SOFT_BOOM -> star(6, 0.5f)
         M3Shape.PUFFY -> star(16, 0.8f)
         M3Shape.BUN -> { path.addOval(androidx.compose.ui.geometry.Rect(c.x-r,c.y-r*0.75f,c.x+r,c.y+r*0.75f)) }
+        M3Shape.WAVY -> {
+            for (i in 0..360 step 6) {
+                val a = Math.toRadians(i.toDouble())
+                val rr = r * (0.82f + 0.18f * sin(i * 6 * Math.PI / 180.0).toFloat())
+                val x = c.x + rr * cos(a).toFloat(); val y = c.y + rr * sin(a).toFloat()
+                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            }
+            path.close()
+        }
+        M3Shape.BLOB -> {
+            for (i in 0..360 step 8) {
+                val a = Math.toRadians(i.toDouble())
+                val rr = r * (0.78f + 0.12f * sin(i * 3 * Math.PI / 180.0).toFloat() + 0.1f * cos(i * 5 * Math.PI / 180.0).toFloat())
+                val x = c.x + rr * cos(a).toFloat(); val y = c.y + rr * sin(a).toFloat()
+                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            }
+            path.close()
+        }
     }
     drawPath(path, fill)
     drawPath(path, stroke, style = Stroke(6f))
