@@ -44,6 +44,8 @@ import com.antonkarpenko.ffmpegkit.FFmpegKitConfig
 import com.antonkarpenko.ffmpegkit.ReturnCode
 import java.io.File
 import java.io.FileOutputStream
+import org.json.JSONArray
+import org.json.JSONObject
 import kotlin.math.*
 
 class MainActivity : ComponentActivity() {
@@ -113,10 +115,107 @@ data class TimelineItem(
     var shape: M3Shape? = null
 )
 
+data class Project(
+    val id: Long = System.currentTimeMillis(),
+    val name: String,
+    val width: Int,
+    val height: Int,
+    val fps: Int,
+    val bgColor: Long
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HomeScreen(projects: List<Project>, onCreate: (Project) -> Unit, onOpen: (Project) -> Unit) {
+    var showDialog by remember { mutableStateOf(false) }
+    if (showDialog) CreateProjectDialog(onDismiss = { showDialog = false }, onCreate = { onCreate(it); showDialog = false })
+
+    Scaffold(
+        floatingActionButton = { FloatingActionButton(onClick = { showDialog = true }, containerColor = MaterialTheme.colorScheme.primary) { Text("+", style = MaterialTheme.typography.headlineMedium) } },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { pad ->
+        Column(Modifier.fillMaxSize().padding(pad).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("CamRIP", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Text("Проекты", color = Color(0xFFB0B0C0))
+            if (projects.isEmpty()) {
+                Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                    Text("Нет проектов. Нажмите + чтобы создать.", color = Color(0xFF8888AA))
+                }
+            } else {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    projects.sortedByDescending { it.id }.forEach { p ->
+                        Card(onClick = { onOpen(p) }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), modifier = Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(14.dp)) {
+                                Text(p.name, fontWeight = FontWeight.SemiBold)
+                                Text("${p.width}x${p.height} • ${p.fps}fps", color = Color(0xFFB0B0C0))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CreateProjectDialog(onDismiss: () -> Unit, onCreate: (Project) -> Unit) {
+    var name by remember { mutableStateOf("Проект ${System.currentTimeMillis() % 10000}") }
+    val formats = listOf("9:16 (1080x1920)" to (1080 to 1920), "16:9 (1920x1080)" to (1920 to 1080), "1:1 (1080x1080)" to (1080 to 1080), "4:5 (1080x1350)" to (1080 to 1350))
+    var formatIdx by remember { mutableStateOf(0) }
+    val qualities = listOf("720p / 30fps" to (720 to 30), "1080p / 30fps" to (1080 to 30), "1080p / 60fps" to (1080 to 60))
+    var qualityIdx by remember { mutableStateOf(1) }
+    val bgColors = listOf("Чёрный" to 0xFF000000, "Белый" to 0xFFFFFFFF, "Тёмно-серый" to 0xFF1A1A1A, "Зелёный" to 0xFF0B3D2E)
+    var bgIdx by remember { mutableStateOf(0) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Новый проект") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Название") }, singleLine = true)
+                Text("Формат", fontWeight = FontWeight.SemiBold)
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    formats.forEachIndexed { i, (label, _) -> FilterChip(selected = formatIdx == i, onClick = { formatIdx = i }, label = { Text(label) }) }
+                }
+                Text("Качество", fontWeight = FontWeight.SemiBold)
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    qualities.forEachIndexed { i, (label, _) -> FilterChip(selected = qualityIdx == i, onClick = { qualityIdx = i }, label = { Text(label) }) }
+                }
+                Text("Фон", fontWeight = FontWeight.SemiBold)
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    bgColors.forEachIndexed { i, (label, _) -> FilterChip(selected = bgIdx == i, onClick = { bgIdx = i }, label = { Text(label) }) }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                val (w, h) = formats[formatIdx].second
+                val (_, fps) = qualities[qualityIdx].second
+                onCreate(Project(name = name.ifBlank { "Проект" }, width = w, height = h, fps = fps, bgColor = bgColors[bgIdx].second))
+            }) { Text("Создать") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CamRipApp() {
     val context = LocalContext.current
+    var projects by remember { mutableStateOf(loadProjects(context)) }
+    var currentProject by remember { mutableStateOf<Project?>(null) }
+    if (currentProject == null) {
+        HomeScreen(
+            projects = projects,
+            onCreate = { p ->
+                val next = listOf(p) + projects
+                projects = next; saveProjects(context, next); currentProject = p
+            },
+            onOpen = { currentProject = it }
+        )
+        return
+    }
     var videoUri by remember { mutableStateOf<Uri?>(null) }
     var durationMs by remember { mutableStateOf(10_000L) }
     var trimRange by remember { mutableStateOf(0f..10f) }
@@ -162,6 +261,11 @@ fun CamRipApp() {
     val selectedItem = items.firstOrNull { it.id == selectedItemId }
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            TextButton(onClick = { currentProject = null }) { Text("← Проекты") }
+            Text(currentProject?.name ?: "CamRIP", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+            Text("${currentProject?.width}x${currentProject?.height}", color = Color(0xFFB0B0C0))
+        }
         ScrollableTabRow(selectedTabIndex = selectedTab, containerColor = MaterialTheme.colorScheme.surface, edgePadding = 8.dp) {
             tabs.forEachIndexed { i, t ->
                 Tab(selected = selectedTab == i, onClick = { selectedTab = i }, text = { Text(t) })
@@ -463,6 +567,33 @@ fun VideoPreview(uri: Uri) {
 fun queryDuration(context: Context, uri: Uri): Long = try {
     context.contentResolver.query(uri, arrayOf(MediaStore.Video.Media.DURATION), null, null, null)?.use { c -> if (c.moveToFirst()) c.getLong(0) else 10_000L } ?: 10_000L
 } catch (_: Exception) { 10_000L }
+
+fun loadProjects(context: Context): List<Project> {
+    val sp = context.getSharedPreferences("camrip", Context.MODE_PRIVATE)
+    val raw = sp.getString("projects", "[]") ?: "[]"
+    return try {
+        val arr = JSONArray(raw)
+        (0 until arr.length()).map { i ->
+            val o = arr.getJSONObject(i)
+            Project(
+                id = o.optLong("id"), name = o.optString("name"),
+                width = o.optInt("width", 1080), height = o.optInt("height", 1920),
+                fps = o.optInt("fps", 30), bgColor = o.optLong("bgColor", 0xFF000000)
+            )
+        }
+    } catch (_: Exception) { emptyList() }
+}
+
+fun saveProjects(context: Context, projects: List<Project>) {
+    val arr = JSONArray()
+    projects.forEach { p ->
+        arr.put(JSONObject().apply {
+            put("id", p.id); put("name", p.name); put("width", p.width)
+            put("height", p.height); put("fps", p.fps); put("bgColor", p.bgColor)
+        })
+    }
+    context.getSharedPreferences("camrip", Context.MODE_PRIVATE).edit().putString("projects", arr.toString()).apply()
+}
 
 fun intensityExpr(kfs: List<Keyframe>, base: Double): String {
     if (kfs.isEmpty()) return base.toString()
