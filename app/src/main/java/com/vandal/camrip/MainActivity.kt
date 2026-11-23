@@ -303,7 +303,7 @@ fun CamRipApp() {
                 }
                 2 -> {
                     Text("Аудио", fontWeight = FontWeight.SemiBold)
-                    Text("Аудио-дорожка: скоро. Пока используется звук исходного видео.", color = Color(0xFFB0B0C0))
+                    Text("Аудио-дорожка: используется звук исходного видео.", color = Color(0xFFB0B0C0))
                 }
                 3 -> {
                     Text("Фигуры", fontWeight = FontWeight.SemiBold)
@@ -348,7 +348,7 @@ fun CamRipApp() {
                         Text("Свойства: ${selectedItem.label}", fontWeight = FontWeight.SemiBold)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             FilterChip(selected = true, onClick = {}, label = { Text("Переместить") })
-                            FilterChip(selected = false, onClick = { status = "Эффекты объекта: в разработке" }, label = { Text("Эффекты") })
+                            FilterChip(selected = false, onClick = { status = "Эффекты объекта будут доступны в обновлении" }, label = { Text("Эффекты") })
                         }
                         Text("X: ${selectedItem.x.roundToInt()}  Y: ${selectedItem.y.roundToInt()}")
                         Slider(value = selectedItem.x, onValueChange = { v -> items = items.map { if (it.id == selectedItem.id) it.copy(x = v) else it } }, valueRange = -300f..300f)
