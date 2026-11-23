@@ -528,7 +528,17 @@ fun exportVideo(context: Context, uri: Uri, startSec: Double, endSec: Double, ef
             val ok = saveToMovies(context, outFile)
             outFile.delete(); input.delete()
             onDone(ok, if (ok) "Сохранено в галерею (Movies/CamRIP)" else "Рендер готов, но не удалось сохранить")
-        } else { input.delete(); onDone(false, "Ошибка рендера: ${session.failStackTrace ?: rc}") }
+        } else {
+            input.delete()
+            val out = session.output?.takeLast(800)?.trim().orEmpty()
+            val stack = session.failStackTrace?.trim().orEmpty()
+            val msg = buildString {
+                append("Ошибка рендера (rc=${rc}).")
+                if (stack.isNotBlank()) append("\n").append(stack.take(500))
+                if (out.isNotBlank()) append("\n").append(out)
+            }
+            onDone(false, msg.ifBlank { "Ошибка рендера: неизвестная ошибка" })
+        }
     }
 }
 
