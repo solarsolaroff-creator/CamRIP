@@ -404,7 +404,7 @@ fun Float.format1(): String = String.format("%.1f", this)
 fun copyUriToCache(context: Context, uri: Uri): File? {
     return try {
         val f = File(context.cacheDir, "input_${System.currentTimeMillis()}.mp4")
-        context.contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(f).use { out -> input.copyTo(out) } } ?: return@try null
+        context.contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(f).use { out -> input.copyTo(out) } } ?: return null
         f
     } catch (_: Exception) { null }
 }
@@ -420,8 +420,8 @@ fun saveToMovies(context: Context, file: File): Boolean {
             }
         }
         val resolver = context.contentResolver
-        val uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values) ?: return@try false
-        resolver.openOutputStream(uri)?.use { out -> file.inputStream().use { it.copyTo(out) } } ?: return@try false
+        val uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values) ?: return false
+        resolver.openOutputStream(uri)?.use { out -> file.inputStream().use { it.copyTo(out) } } ?: return false
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) { values.clear(); values.put(MediaStore.Video.Media.IS_PENDING, 0); resolver.update(uri, values, null, null) }
         true
     } catch (_: Exception) { false }
