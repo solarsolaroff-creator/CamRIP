@@ -401,24 +401,28 @@ fun exportVideo(context: Context, uri: Uri, startSec: Double, endSec: Double, ef
 fun quote(s: String): String = "'" + s.replace("'", "'\\''") + "'"
 fun Float.format1(): String = String.format("%.1f", this)
 
-fun copyUriToCache(context: Context, uri: Uri): File? = try {
-    val f = File(context.cacheDir, "input_${System.currentTimeMillis()}.mp4")
-    context.contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(f).use { out -> input.copyTo(out) } } ?: return null
-    f
-} catch (_: Exception) { null }
+fun copyUriToCache(context: Context, uri: Uri): File? {
+    return try {
+        val f = File(context.cacheDir, "input_${System.currentTimeMillis()}.mp4")
+        context.contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(f).use { out -> input.copyTo(out) } } ?: return@try null
+        f
+    } catch (_: Exception) { null }
+}
 
-fun saveToMovies(context: Context, file: File): Boolean = try {
-    val values = ContentValues().apply {
-        put(MediaStore.Video.Media.DISPLAY_NAME, "CamRIP_${System.currentTimeMillis()}.mp4")
-        put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/CamRIP")
-            put(MediaStore.Video.Media.IS_PENDING, 1)
+fun saveToMovies(context: Context, file: File): Boolean {
+    return try {
+        val values = ContentValues().apply {
+            put(MediaStore.Video.Media.DISPLAY_NAME, "CamRIP_${System.currentTimeMillis()}.mp4")
+            put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/CamRIP")
+                put(MediaStore.Video.Media.IS_PENDING, 1)
+            }
         }
-    }
-    val resolver = context.contentResolver
-    val uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values) ?: return false
-    resolver.openOutputStream(uri)?.use { out -> file.inputStream().use { it.copyTo(out) } } ?: return false
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) { values.clear(); values.put(MediaStore.Video.Media.IS_PENDING, 0); resolver.update(uri, values, null, null) }
-    true
-} catch (_: Exception) { false }
+        val resolver = context.contentResolver
+        val uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values) ?: return@try false
+        resolver.openOutputStream(uri)?.use { out -> file.inputStream().use { it.copyTo(out) } } ?: return@try false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) { values.clear(); values.put(MediaStore.Video.Media.IS_PENDING, 0); resolver.update(uri, values, null, null) }
+        true
+    } catch (_: Exception) { false }
+}
