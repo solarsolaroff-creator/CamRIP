@@ -49,17 +49,18 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
 
-    // Media3 ExoPlayer
-    implementation("androidx.media3:media3-exoplayer:1.4.0")
-    implementation("androidx.media3:media3-ui:1.4.0")
+    val media3 = "1.4.0"
+    implementation("androidx.media3:media3-exoplayer:$media3")
+    implementation("androidx.media3:media3-ui:$media3")
+    implementation("androidx.media3:media3-effect:$media3")
+    implementation("androidx.media3:media3-transformer:$media3")
+    implementation("androidx.media3:media3-common:$media3")
 
-    // FFmpegKit maintained fork (Arthenica originals removed from Maven Central)
-    implementation("com.antonkarpenko:ffmpeg-kit-full:2.2.1")
-
-    // 3D preview
+    // Real 3D (Filament via SceneView)
     implementation("io.github.sceneview:sceneview:2.2.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
