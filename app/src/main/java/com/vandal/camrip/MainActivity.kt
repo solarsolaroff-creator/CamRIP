@@ -98,7 +98,8 @@ enum class M3Shape(val title: String) {
     CIRCLE("Circle"), SQUARE("Square"), PILL("Pill"), ARCH("Arch"), DIAMOND("Diamond"),
     PENTAGON("Pentagon"), CLOVER4("Clover4"), CLOVER8("Clover8"), BURST("Burst"),
     SOFT_BURST("SoftBurst"), FLOWER("Flower"), COOKIE6("Cookie6"), COOKIE12("Cookie12"),
-    BOOM("Boom"), SOFT_BOOM("SoftBoom"), PUFFY("Puffy"), BUN("Bun"), WAVY("Wavy"), BLOB("Blob")
+    BOOM("Boom"), SOFT_BOOM("SoftBoom"), PUFFY("Puffy"), BUN("Bun"), WAVY("Wavy"), BLOB("Blob"),
+    PHONE("Phone"), PHONE_NOTCH("Phone Notch"), TABLET("Tablet"), HEART("Heart"), STAR("Star"), CLOUD("Cloud")
 }
 
 data class TimelineItem(
@@ -444,8 +445,16 @@ fun CamRipApp() {
         }
 
         // Bottom timeline
-        Surface(tonalElevation = 2.dp, color = MaterialTheme.colorScheme.surface) {
+        Surface(tonalElevation = 3.dp, color = Color(0xFF14141C)) {
             Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = false, onClick = { showEffectsScreen = true }, label = { Text("Эффекты") })
+                    FilterChip(selected = selectedTab == 3, onClick = { selectedTab = 3 }, label = { Text("Фигуры") })
+                    FilterChip(selected = selectedTab == 4, onClick = { selectedTab = 4 }, label = { Text("Вектор") })
+                    FilterChip(selected = selectedTab == 1, onClick = { selectedTab = 1 }, label = { Text("Медиа") })
+                    FilterChip(selected = selectedTab == 2, onClick = { selectedTab = 2 }, label = { Text("Аудио") })
+                    FilterChip(selected = false, onClick = { selectedTab = 0 }, label = { Text("Текст") })
+                }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text("Таймлайн", fontWeight = FontWeight.SemiBold)
                     Text("${playhead.format1()}s / ${(durationMs/1000f).format1()}s", color = Color(0xFFB0B0C0))
@@ -564,6 +573,43 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.drawM3Shape(shape: M3Shape,
                 if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
             }
             path.close()
+        }
+        M3Shape.PHONE -> {
+            val w = r * 0.95f; val h = r * 1.55f
+            drawRoundRect(fill, topLeft = Offset(c.x-w/2, c.y-h/2), size = Size(w,h), cornerRadius = androidx.compose.ui.geometry.CornerRadius(r*0.18f))
+            drawRoundRect(stroke, topLeft = Offset(c.x-w/2, c.y-h/2), size = Size(w,h), cornerRadius = androidx.compose.ui.geometry.CornerRadius(r*0.18f), style = Stroke(6f))
+            drawRoundRect(Color.Black.copy(alpha=0.25f), topLeft = Offset(c.x-w*0.42f, c.y-h*0.42f), size = Size(w*0.84f,h*0.78f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(r*0.1f))
+            return
+        }
+        M3Shape.PHONE_NOTCH -> {
+            val w = r * 0.95f; val h = r * 1.55f
+            drawRoundRect(fill, topLeft = Offset(c.x-w/2, c.y-h/2), size = Size(w,h), cornerRadius = androidx.compose.ui.geometry.CornerRadius(r*0.18f))
+            drawRoundRect(stroke, topLeft = Offset(c.x-w/2, c.y-h/2), size = Size(w,h), cornerRadius = androidx.compose.ui.geometry.CornerRadius(r*0.18f), style = Stroke(6f))
+            drawRoundRect(Color.Black.copy(alpha=0.25f), topLeft = Offset(c.x-w*0.42f, c.y-h*0.42f), size = Size(w*0.84f,h*0.78f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(r*0.1f))
+            drawRoundRect(Color.Black.copy(alpha=0.35f), topLeft = Offset(c.x-w*0.18f, c.y-h*0.46f), size = Size(w*0.36f,h*0.07f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(r*0.05f))
+            return
+        }
+        M3Shape.TABLET -> {
+            val w = r * 1.45f; val h = r * 1.1f
+            drawRoundRect(fill, topLeft = Offset(c.x-w/2, c.y-h/2), size = Size(w,h), cornerRadius = androidx.compose.ui.geometry.CornerRadius(r*0.12f))
+            drawRoundRect(stroke, topLeft = Offset(c.x-w/2, c.y-h/2), size = Size(w,h), cornerRadius = androidx.compose.ui.geometry.CornerRadius(r*0.12f), style = Stroke(6f))
+            drawRoundRect(Color.Black.copy(alpha=0.22f), topLeft = Offset(c.x-w*0.44f, c.y-h*0.38f), size = Size(w*0.88f,h*0.76f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(r*0.08f))
+            return
+        }
+        M3Shape.HEART -> {
+            val s = r * 0.9f
+            path.moveTo(c.x, c.y + s*0.8f)
+            path.cubicTo(c.x - s*1.4f, c.y + s*0.2f, c.x - s*1.1f, c.y - s*0.8f, c.x, c.y - s*0.3f)
+            path.cubicTo(c.x + s*1.1f, c.y - s*0.8f, c.x + s*1.4f, c.y + s*0.2f, c.x, c.y + s*0.8f)
+            path.close()
+        }
+        M3Shape.STAR -> star(5, 0.45f)
+        M3Shape.CLOUD -> {
+            drawCircle(fill, r*0.35f, Offset(c.x-r*0.35f, c.y))
+            drawCircle(fill, r*0.45f, Offset(c.x, c.y-r*0.15f))
+            drawCircle(fill, r*0.35f, Offset(c.x+r*0.35f, c.y))
+            drawRoundRect(fill, topLeft = Offset(c.x-r*0.7f, c.y-r*0.05f), size = Size(r*1.4f, r*0.55f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(r*0.3f))
+            return
         }
     }
     drawPath(path, fill)
