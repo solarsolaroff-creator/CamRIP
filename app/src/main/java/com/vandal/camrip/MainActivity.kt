@@ -299,11 +299,29 @@ fun CamRipApp() {
             Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            if (videoUri != null) {
-                VideoPreview(uri = videoUri!!)
-            } else {
-                Box(Modifier.fillMaxWidth().height(220.dp).background(Color(0xFF101018), RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
-                    Text("Превью видео", color = Color(0xFF8888AA))
+            val proj = currentProject
+            val bg = if (proj != null) Color(proj.bgColor) else Color(0xFF101018)
+            val aspect = if (proj != null && proj.height != 0) proj.width.toFloat() / proj.height.toFloat() else 16f / 9f
+            Box(
+                Modifier.fillMaxWidth().aspectRatio(aspect).background(bg, RoundedCornerShape(16.dp))
+            ) {
+                if (videoUri != null) {
+                    VideoPreview(uri = videoUri!!, modifier = Modifier.fillMaxSize())
+                } else {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("Вы пока не выбрали никакое видео", color = Color(0xFF8888AA))
+                    }
+                }
+                Canvas(Modifier.fillMaxSize()) {
+                    items.filter { it.shape != null }.forEach { item ->
+                        withTransform({
+                            translate(left = item.x, top = item.y)
+                            rotate(item.rotation, pivot = center)
+                            scale(item.scale, item.scale, pivot = center)
+                        }) {
+                            drawM3Shape(item.shape!!, item.color, item.color.copy(alpha = 0.22f))
+                        }
+                    }
                 }
             }
 
@@ -430,7 +448,7 @@ fun CamRipApp() {
                 val uri = videoUri ?: return@Button
                 exporting = true; progress = 0f; status = "Рендеринг..."
                 val sub = subtitleText.trim().let { if (it.isBlank()) "" else if (subtitleIsSpeech) "[- $it]" else "[$it]" }
-                exportVideo(context, uri, trimRange.start.toDouble(), trimRange.endInclusive.toDouble(), effect, keyframes, sub,
+                exportVideo(context, uri, trimRange.start.toDouble(), trimRange.endInclusive.toDouble(), effect, keyframes, sub, currentProject?.fps ?: 30,
                     onProgress = { p -> progress = p },
                     onDone = { _, msg -> exporting = false; status = msg; Toast.makeText(context, msg, Toast.LENGTH_LONG).show() })
             }, enabled = !exporting && videoUri != null, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)) { Text("Экспорт в MP4") }
@@ -617,7 +635,7 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.drawM3Shape(shape: M3Shape,
 }
 
 @Composable
-fun VideoPreview(uri: Uri) {
+fun VideoPreview(uri: Uri, modifier: Modifier = Modifier.fillMaxWidth().height(260.dp).background(Color.Black, RoundedCornerShape(12.dp))) {
     val context = LocalContext.current
     val exoPlayer = remember(uri) {
         ExoPlayer.Builder(context).build().apply { setMediaItem(MediaItem.fromUri(uri)); prepare(); playWhenReady = false }
@@ -625,7 +643,7 @@ fun VideoPreview(uri: Uri) {
     DisposableEffect(exoPlayer) { onDispose { exoPlayer.release() } }
     AndroidView(
         factory = { ctx -> PlayerView(ctx).apply { player = exoPlayer; useController = true } },
-        modifier = Modifier.fillMaxWidth().height(260.dp).background(Color.Black, RoundedCornerShape(12.dp))
+        modifier = modifier
     )
 }
 
@@ -683,7 +701,7 @@ fun intensityExpr(kfs: List<Keyframe>, base: Double): String {
     return "if(lt(t,${sorted.first().timeSec}),${base * sorted.first().intensity},$expr)"
 }
 
-fun exportVideo(context: Context, uri: Uri, startSec: Double, endSec: Double, effect: GlitchEffect, kfs: List<Keyframe>, subtitle: String, onProgress: (Float) -> Unit, onDone: (Boolean, String) -> Unit) {
+fun exportVideo(context: Context, uri: Uri, startSec: Double, endSec: Double, effect: GlitchEffect, kfs: List<Keyframe>, subtitle: String, fps: Int, onProgress: (Float) -> Unit, onDone: (Boolean, String) -> Unit) {
     val input = copyUriToCache(context, uri) ?: run { onDone(false, "Не удалось прочитать видео"); return }
     val outFile = File(context.cacheDir, "camrip_${System.currentTimeMillis()}.mp4")
     val dur = max(0.5, endSec - startSec)
@@ -714,7 +732,7 @@ fun exportVideo(context: Context, uri: Uri, startSec: Double, endSec: Double, ef
             .replace(";", "\\;")
         "$filter,drawtext=text='$escaped':fontfile=/system/fonts/Roboto-Regular.ttf:fontsize=36:fontcolor=white:borderw=2:bordercolor=black:x=(w-text_w)/2:y=h-th-40"
     }
-    val cmd = "-y -ss $startSec -t $dur -i ${quote(input.absolutePath)} -vf ${quote(vf)} -map 0:v:0 -map 0:a? -c:v mpeg4 -q:v 3 -c:a aac -b:a 128k ${quote(outFile.absolutePath)}"
+    val cmd = "-y -ss $startSec -t $dur -i ${quote(input.absolutePath)} -vf ${quote(vf)} -map 0:v:0 -map 0:a? -r $fps -c:v mpeg4 -q:v 3 -c:a aac -b:a 128k ${quote(outFile.absolutePath)}"
 
     FFmpegKitConfig.enableStatisticsCallback { stat -> onProgress((stat.time / (dur * 1000.0)).toFloat().coerceIn(0f, 1f)) }
     FFmpegKit.executeAsync(cmd) { session ->
