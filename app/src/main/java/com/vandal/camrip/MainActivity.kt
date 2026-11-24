@@ -43,7 +43,6 @@ import androidx.media3.common.Effect
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.Brightness
 import androidx.media3.effect.Contrast
-import androidx.media3.effect.Grayscale
 import androidx.media3.effect.RgbFilter
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.transformer.Composition
@@ -362,10 +361,10 @@ fun exportWithTransformer(context: Context, uri: Uri, fx: VideoFx, onDone: (Bool
     val outFile = File(context.cacheDir, "camrip_export_${System.currentTimeMillis()}.mp4")
     val effects = when (fx) {
         VideoFx.NONE -> Effects(emptyList(), emptyList())
-        VideoFx.GRAYSCALE -> Effects(listOf(RgbFilter.createGrayscaleFilter()), emptyList())
-        VideoFx.BRIGHTNESS -> Effects(listOf(Brightness(0.2f)), emptyList())
-        VideoFx.CONTRAST -> Effects(listOf(Contrast(0.3f)), emptyList())
-        VideoFx.GLITCH -> Effects(listOf(RgbFilter.createGrayscaleFilter(), Contrast(0.4f)), emptyList())
+        VideoFx.GRAYSCALE -> Effects(emptyList(), listOf(RgbFilter.createGrayscaleFilter()))
+        VideoFx.BRIGHTNESS -> Effects(emptyList(), listOf(Brightness(0.2f)))
+        VideoFx.CONTRAST -> Effects(emptyList(), listOf(Contrast(0.3f)))
+        VideoFx.GLITCH -> Effects(emptyList(), listOf(RgbFilter.createGrayscaleFilter(), Contrast(0.4f)))
         VideoFx.BLUR -> Effects(emptyList(), emptyList())
     }
     val edited = EditedMediaItem.Builder(MediaItem.fromUri(uri)).setEffects(effects).build()
@@ -385,31 +384,35 @@ fun exportWithTransformer(context: Context, uri: Uri, fx: VideoFx, onDone: (Bool
     transformer.start(edited, outFile.absolutePath)
 }
 
-fun saveVideoToMovies(context: Context, file: File): Boolean = try {
-    val values = ContentValues().apply {
-        put(MediaStore.Video.Media.DISPLAY_NAME, "CamRIP_${System.currentTimeMillis()}.mp4")
-        put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/CamRIP")
-            put(MediaStore.Video.Media.IS_PENDING, 1)
+fun saveVideoToMovies(context: Context, file: File): Boolean {
+    return try {
+        val values = ContentValues().apply {
+            put(MediaStore.Video.Media.DISPLAY_NAME, "CamRIP_${System.currentTimeMillis()}.mp4")
+            put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/CamRIP")
+                put(MediaStore.Video.Media.IS_PENDING, 1)
+            }
         }
-    }
-    val resolver = context.contentResolver
-    val uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values) ?: return false
-    resolver.openOutputStream(uri)?.use { out -> file.inputStream().use { it.copyTo(out) } } ?: return false
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        values.clear(); values.put(MediaStore.Video.Media.IS_PENDING, 0); resolver.update(uri, values, null, null)
-    }
-    true
-} catch (_: Exception) { false }
+        val resolver = context.contentResolver
+        val uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values) ?: return@try false
+        resolver.openOutputStream(uri)?.use { out -> file.inputStream().use { it.copyTo(out) } } ?: return@try false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            values.clear(); values.put(MediaStore.Video.Media.IS_PENDING, 0); resolver.update(uri, values, null, null)
+        }
+        true
+    } catch (_: Exception) { false }
+}
 
-fun importModelToFilesDir(context: Context, uri: Uri): SavedModel? = try {
-    val name = (uri.lastPathSegment ?: "model.glb").substringAfterLast('/').let { if (it.endsWith(".glb") || it.endsWith(".gltf")) it else "$it.glb" }
-    val dir = File(context.filesDir, "models").apply { mkdirs() }
-    val out = File(dir, name)
-    context.contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(out).use { input.copyTo(it) } } ?: return null
-    SavedModel(out.name, out)
-} catch (_: Exception) { null }
+fun importModelToFilesDir(context: Context, uri: Uri): SavedModel? {
+    return try {
+        val name = (uri.lastPathSegment ?: "model.glb").substringAfterLast('/').let { if (it.endsWith(".glb") || it.endsWith(".gltf")) it else "$it.glb" }
+        val dir = File(context.filesDir, "models").apply { mkdirs() }
+        val out = File(dir, name)
+        context.contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(out).use { input.copyTo(it) } } ?: return@try null
+        SavedModel(out.name, out)
+    } catch (_: Exception) { null }
+}
 
 fun loadSavedModels(context: Context): List<SavedModel> {
     val dir = File(context.filesDir, "models")
