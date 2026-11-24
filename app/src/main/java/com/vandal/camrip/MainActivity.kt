@@ -93,6 +93,12 @@ enum class Easing(val title: String) {
     WAVE("Волна")
 }
 
+enum class ScaleMode(val title: String) {
+    NONE("Вручную"),
+    FIT_CENTER("Вписать"),
+    FILL_CROP("Заполнить")
+}
+
 data class Keyframe(val timeSec: Float, val intensity: Float, val easing: Easing = Easing.LINEAR) // intensity 0..1
 
 enum class M3Shape(val title: String) {
@@ -237,6 +243,8 @@ fun CamRipApp() {
 
     var subtitleText by remember { mutableStateOf("") }
     var subtitleIsSpeech by remember { mutableStateOf(true) }
+    var scaleMode by remember { mutableStateOf(ScaleMode.NONE) }
+    var scaleValue by remember { mutableStateOf(1f) }
 
     val tabs = listOf("Видео", "Медиа", "Аудио", "Фигуры", "Вектор")
     var selectedTab by remember { mutableStateOf(0) }
@@ -334,6 +342,14 @@ fun CamRipApp() {
                     Button(onClick = { showEffectsScreen = true }, enabled = !exporting) {
                         Text("Эффекты: ${effect.title}")
                     }
+                    Text("Помощник по масштабированию", fontWeight = FontWeight.SemiBold)
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ScaleMode.entries.forEach { m ->
+                            FilterChip(selected = scaleMode == m, onClick = { scaleMode = m }, label = { Text(m.title) }, enabled = !exporting)
+                        }
+                    }
+                    Text("Масштаб: ${String.format("%.2f", scaleValue)}x")
+                    Slider(value = scaleValue, onValueChange = { scaleValue = it }, valueRange = 0.5f..2f, enabled = !exporting)
                 }
                 1 -> {
                     Text("Медиа", fontWeight = FontWeight.SemiBold)
@@ -449,7 +465,7 @@ fun CamRipApp() {
                 val uri = videoUri ?: return@Button
                 exporting = true; progress = 0f; status = "Рендеринг..."
                 val sub = subtitleText.trim().let { if (it.isBlank()) "" else if (subtitleIsSpeech) "[- $it]" else "[$it]" }
-                exportVideo(context, uri, trimRange.start.toDouble(), trimRange.endInclusive.toDouble(), effect, keyframes, sub, currentProject?.fps ?: 30,
+                exportVideo(context, uri, trimRange.start.toDouble(), trimRange.endInclusive.toDouble(), effect, keyframes, sub, currentProject?.fps ?: 30, scaleMode, scaleValue,
                     onProgress = { p -> progress = p },
                     onDone = { _, msg -> exporting = false; status = msg; Toast.makeText(context, msg, Toast.LENGTH_LONG).show() })
             }, enabled = !exporting && videoUri != null, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)) { Text("Экспорт в MP4") }
@@ -702,7 +718,7 @@ fun intensityExpr(kfs: List<Keyframe>, base: Double): String {
     return "if(lt(t,${sorted.first().timeSec}),${base * sorted.first().intensity},$expr)"
 }
 
-fun exportVideo(context: Context, uri: Uri, startSec: Double, endSec: Double, effect: GlitchEffect, kfs: List<Keyframe>, subtitle: String, fps: Int, onProgress: (Float) -> Unit, onDone: (Boolean, String) -> Unit) {
+fun exportVideo(context: Context, uri: Uri, startSec: Double, endSec: Double, effect: GlitchEffect, kfs: List<Keyframe>, subtitle: String, fps: Int, scaleMode: ScaleMode, scaleValue: Float, onProgress: (Float) -> Unit, onDone: (Boolean, String) -> Unit) {
     val input = copyUriToCache(context, uri) ?: run { onDone(false, "Не удалось прочитать видео"); return }
     val outFile = File(context.cacheDir, "camrip_${System.currentTimeMillis()}.mp4")
     val dur = max(0.5, endSec - startSec)
@@ -723,7 +739,14 @@ fun exportVideo(context: Context, uri: Uri, startSec: Double, endSec: Double, ef
         GlitchEffect.EXPOSURE -> "eq=brightness='0.08*sin(t*4)*${amp}':contrast='1+0.15*${amp}'"
         GlitchEffect.SWING -> "rotate='8*${amp}*sin(2*PI*2*t)*PI/180':fillcolor=black@0:ow=iw:oh=ih"
     }
-    val vf = if (subtitle.isBlank()) filter else {
+    val s = scaleValue.coerceIn(0.5f, 2f)
+    val scalePrefix = when (scaleMode) {
+        ScaleMode.NONE -> "scale=trunc(iw*$s/2)*2:trunc(ih*$s/2)*2"
+        ScaleMode.FIT_CENTER -> "scale=trunc(iw*$s/2)*2:trunc(ih*$s/2)*2:force_original_aspect_ratio=decrease,pad=trunc(iw*$s/2)*2:trunc(ih*$s/2)*2:(ow-iw)/2:(oh-ih)/2:black"
+        ScaleMode.FILL_CROP -> "scale=trunc(iw*$s/2)*2:trunc(ih*$s/2)*2:force_original_aspect_ratio=increase,crop=trunc(iw*$s/2)*2:trunc(ih*$s/2)*2"
+    }
+    val baseFilter = "$scalePrefix,$filter"
+    val vf = if (subtitle.isBlank()) baseFilter else {
         val escaped = subtitle
             .replace("\\", "\\\\")
             .replace(":", "\\:")
@@ -732,7 +755,7 @@ fun exportVideo(context: Context, uri: Uri, startSec: Double, endSec: Double, ef
             .replace("]", "\\]")
             .replace(",", "\\,")
             .replace(";", "\\;")
-        "$filter,drawtext=text='$escaped':fontfile=/system/fonts/Roboto-Regular.ttf:fontsize=36:fontcolor=white:borderw=2:bordercolor=black:x=(w-text_w)/2:y=h-th-40"
+        "$baseFilter,drawtext=text='$escaped':fontfile=/system/fonts/Roboto-Regular.ttf:fontsize=36:fontcolor=white:borderw=2:bordercolor=black:x=(w-text_w)/2:y=h-th-40"
     }
     val cmd = "-y -ss $startSec -t $dur -i ${quote(input.absolutePath)} -vf ${quote(vf)} -map 0:v:0 -map 0:a? -r $fps -c:v mpeg4 -q:v 3 -c:a aac -b:a 128k ${quote(outFile.absolutePath)}"
 
