@@ -55,6 +55,7 @@ import io.github.sceneview.rememberModelLoader
 import io.github.sceneview.rememberNode
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlinx.coroutines.delay
 import kotlin.math.*
 
 class MainActivity : ComponentActivity() {
@@ -241,6 +242,8 @@ fun CamRipApp() {
     var progress by remember { mutableStateOf(0f) }
     var status by remember { mutableStateOf("Выберите видео для начала") }
     var playhead by remember { mutableStateOf(0f) }
+    var isPlaying by remember { mutableStateOf(false) }
+    var playReverse by remember { mutableStateOf(false) }
 
     var keyframes by remember { mutableStateOf(listOf(Keyframe(0f, 1f), Keyframe(10f, 1f))) }
     var selectedKf by remember { mutableStateOf(0) }
@@ -279,6 +282,16 @@ fun CamRipApp() {
     }
 
     val selectedItem = items.firstOrNull { it.id == selectedItemId }
+
+    LaunchedEffect(isPlaying, playReverse, videoUri) {
+        while (isPlaying) {
+            delay(100)
+            val maxSec = (durationMs / 1000f)
+            val delta = if (playReverse) -0.1f else 0.1f
+            playhead = (playhead + delta).coerceIn(0f, maxSec)
+            if (playhead >= maxSec || playhead <= 0f) isPlaying = false
+        }
+    }
 
     if (showEffectsScreen) {
         var effectTab by remember { mutableStateOf(0) }
@@ -558,10 +571,12 @@ fun CamRipApp() {
                 Slider(value = playhead, onValueChange = { playhead = it }, valueRange = 0f..(durationMs / 1000f))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedButton(onClick = { playhead = (playhead - 10f).coerceAtLeast(0f) }) { Text("-10с") }
+                    Button(onClick = { isPlaying = !isPlaying }) { Text(if (isPlaying) "Пауза" else "Старт") }
+                    OutlinedButton(onClick = { playReverse = !playReverse }) { Text(if (playReverse) "Назад" else "Вперёд") }
                     OutlinedButton(onClick = { playhead = (playhead + 10f).coerceAtMost(durationMs / 1000f) }) { Text("+10с") }
                     Button(onClick = {
-                        val it = TimelineItem(type = "shape", label = selectedShape?.title ?: "Фигура", startSec = playhead, shape = selectedShape ?: M3Shape.CIRCLE, color = objColor)
-                        items = items + it; selectedItemId = it.id; selectedTab = 3
+                        val newItem = TimelineItem(type = "shape", label = selectedShape?.title ?: "Фигура", startSec = playhead, shape = selectedShape ?: M3Shape.CIRCLE, color = objColor)
+                        items = items + newItem; selectedItemId = newItem.id; selectedTab = 3
                     }) { Text("+") }
                 }
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
