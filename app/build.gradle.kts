@@ -59,5 +59,8 @@ dependencies {
     // FFmpegKit maintained fork (Arthenica originals removed from Maven Central)
     implementation("com.antonkarpenko:ffmpeg-kit-full:2.2.1")
 
+    // 3D preview
+    implementation("io.github.sceneview:sceneview:2.2.1")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

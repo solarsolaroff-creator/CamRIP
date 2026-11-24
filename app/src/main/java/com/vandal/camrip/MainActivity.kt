@@ -44,6 +44,15 @@ import com.antonkarpenko.ffmpegkit.FFmpegKitConfig
 import com.antonkarpenko.ffmpegkit.ReturnCode
 import java.io.File
 import java.io.FileOutputStream
+import io.github.sceneview.Scene
+import io.github.sceneview.math.Position
+import io.github.sceneview.node.ModelNode
+import io.github.sceneview.rememberCameraNode
+import io.github.sceneview.rememberEngine
+import io.github.sceneview.rememberEnvironmentLoader
+import io.github.sceneview.rememberMainLightNode
+import io.github.sceneview.rememberModelLoader
+import io.github.sceneview.rememberNode
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.math.*
@@ -296,7 +305,16 @@ fun CamRipApp() {
                     }
                 }
             } else {
-                Text("3D объекты (превью)", color = Color(0xFFB0B0C0))
+                Text("3D объекты (SceneView)", color = Color(0xFFB0B0C0))
+                val engine = rememberEngine()
+                val modelLoader = rememberModelLoader(engine)
+                Box(Modifier.fillMaxWidth().height(220.dp).background(Color(0xFF101018), RoundedCornerShape(12.dp))) {
+                    Scene(
+                        modifier = Modifier.fillMaxSize(),
+                        engine = engine,
+                        modelLoader = modelLoader,
+                    )
+                }
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     objects3d.forEach { name ->
                         Card(onClick = {
