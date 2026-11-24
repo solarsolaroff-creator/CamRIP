@@ -256,7 +256,7 @@ fun EffectItem.toMedia3Effects(): List<Effect> = when (type) {
     "glitch" -> listOf(RgbFilter.createGrayscaleFilter(), Contrast((intensity * 0.8f).coerceIn(-1f, 1f)))
     "chromatic" -> listOf(Contrast((intensity * 0.4f).coerceIn(-1f, 1f)))
     "rotate3d", "perspective", "cube", "parallax" -> listOf(ScaleAndRotateTransformation.Builder().setRotationDegrees(angleZ).build())
-    "zoom" -> listOf(ScaleAndRotateTransformation.Builder().setScale(scale.coerceAtLeast(0.1f)).build())
+    "zoom" -> listOf(ScaleAndRotateTransformation.Builder().setScale(scale.coerceAtLeast(0.1f), scale.coerceAtLeast(0.1f)).build())
     "shake", "wave", "fisheye" -> emptyList() // preview-only placeholders; export-safe no-op
     else -> emptyList()
 }
@@ -280,31 +280,35 @@ fun exportClip(context: Context, clip: Clip, effects: List<EffectItem>, onDone: 
     transformer.start(edited, outFile.absolutePath)
 }
 
-fun saveToGallery(context: Context, file: File): Boolean = try {
-    val values = ContentValues().apply {
-        put(MediaStore.Video.Media.DISPLAY_NAME, "CamRIP_${System.currentTimeMillis()}.mp4")
-        put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) { put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/CamRIP"); put(MediaStore.Video.Media.IS_PENDING, 1) }
-    }
-    val resolver = context.contentResolver
-    val uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values) ?: return false
-    resolver.openOutputStream(uri)?.use { out -> file.inputStream().use { it.copyTo(out) } } ?: return false
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) { values.clear(); values.put(MediaStore.Video.Media.IS_PENDING, 0); resolver.update(uri, values, null, null) }
-    true
-} catch (_: Exception) { false }
+fun saveToGallery(context: Context, file: File): Boolean {
+    return try {
+        val values = ContentValues().apply {
+            put(MediaStore.Video.Media.DISPLAY_NAME, "CamRIP_${System.currentTimeMillis()}.mp4")
+            put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) { put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/CamRIP"); put(MediaStore.Video.Media.IS_PENDING, 1) }
+        }
+        val resolver = context.contentResolver
+        val uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values) ?: return false
+        resolver.openOutputStream(uri)?.use { out -> file.inputStream().use { it.copyTo(out) } } ?: return false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) { values.clear(); values.put(MediaStore.Video.Media.IS_PENDING, 0); resolver.update(uri, values, null, null) }
+        true
+    } catch (_: Exception) { false }
+}
 
-fun importModelToFilesDir(context: Context, uri: Uri): File? = try {
-    val nameRaw = (uri.lastPathSegment ?: "model_${System.currentTimeMillis()}.glb").substringAfterLast('/')
-    val safe = nameRaw.replace(Regex("[^A-Za-z0-9._-]"), "_")
-    val name = when {
-        safe.endsWith(".glb", true) || safe.endsWith(".gltf", true) -> safe
-        else -> "$safe.glb"
-    }
-    val dir = File(context.filesDir, "models").apply { mkdirs() }
-    val out = File(dir, "${System.currentTimeMillis()}_$name")
-    context.contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(out).use { input.copyTo(it) } } ?: return null
-    out
-} catch (_: Exception) { null }
+fun importModelToFilesDir(context: Context, uri: Uri): File? {
+    return try {
+        val nameRaw = (uri.lastPathSegment ?: "model_${System.currentTimeMillis()}.glb").substringAfterLast('/')
+        val safe = nameRaw.replace(Regex("[^A-Za-z0-9._-]"), "_")
+        val name = when {
+            safe.endsWith(".glb", true) || safe.endsWith(".gltf", true) -> safe
+            else -> "$safe.glb"
+        }
+        val dir = File(context.filesDir, "models").apply { mkdirs() }
+        val out = File(dir, "${System.currentTimeMillis()}_$name")
+        context.contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(out).use { input.copyTo(it) } } ?: return null
+        out
+    } catch (_: Exception) { null }
+}
 
 fun formatMs(ms: Long): String {
     val total = (ms / 1000).coerceAtLeast(0)
