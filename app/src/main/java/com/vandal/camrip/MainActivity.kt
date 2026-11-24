@@ -626,7 +626,7 @@ fun exportVideo(context: Context, uri: Uri, startSec: Double, endSec: Double, ef
     val filter = when (effect) {
         GlitchEffect.RGB -> "split=3[r][g][b];[r]lutrgb=g=0:b=0[rr];[g]lutrgb=r=0:b=0[gg];[b]lutrgb=r=0:g=0[bb];[rr][gg]blend=all_mode='addition'[rg];[rg][bb]blend=all_mode='addition',rgbashift=rh='8*${amp}':gh='-6*${amp}':bh='4*${amp}'"
         GlitchEffect.VHS -> "noise=alls='20*${amp}':allf=t+u,drawgrid=w=iw:h=2:t=1:c=white@0.08,eq=contrast='1+0.2*${amp}':saturation='1+0.4*${amp}'"
-        GlitchEffect.DATAMOSH -> "lagfun=decay='0.9+0.08*${amp}',tblend=all_mode='difference128',eq=contrast='1+0.3*${amp}':saturation='1+0.5*${amp}'"
+        GlitchEffect.DATAMOSH -> "tblend=all_mode=difference128,eq=contrast='1+0.3*${amp}':saturation='1+0.5*${amp}'"
         GlitchEffect.PIXEL -> "scale=iw/'(8+24*(1-${amp}))':ih/'(8+24*(1-${amp}))':flags=neighbor,scale=iw*'(8+24*(1-${amp}))':ih*'(8+24*(1-${amp}))':flags=neighbor"
         GlitchEffect.SCAN -> "drawgrid=w=iw:h='2+2*${amp}':t=1:c=black@0.25,noise=alls='10*${amp}':allf=t"
         GlitchEffect.WAVE -> "geq=lum='lum(X+10*sin(2*PI*Y/80+T*3)*${amp},Y)':cb='cb(X,Y)':cr='cr(X,Y)'"
