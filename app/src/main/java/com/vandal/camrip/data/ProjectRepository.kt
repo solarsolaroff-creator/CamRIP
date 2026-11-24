@@ -1,0 +1,80 @@
+package com.vandal.camrip.data
+
+import android.content.Context
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
+
+class ProjectRepository(private val context: Context) {
+    private val file: File get() = File(context.filesDir, "projects.json")
+
+    @Synchronized
+    fun loadProjects(): List<Project> {
+        if (!file.exists()) return emptyList()
+        return try {
+            val arr = JSONArray(file.readText())
+            (0 until arr.length()).map { i -> arr.getJSONObject(i).toProject() }.sortedByDescending { it.updatedAt }
+        } catch (_: Exception) { emptyList() }
+    }
+
+    fun getProject(id: Long): Project? = loadProjects().firstOrNull { it.id == id }
+
+    @Synchronized
+    fun saveProject(project: Project) {
+        val list = loadProjects().toMutableList()
+        val idx = list.indexOfFirst { it.id == project.id }
+        val updated = project.copy(updatedAt = System.currentTimeMillis())
+        if (idx >= 0) list[idx] = updated else list.add(0, updated)
+        saveAll(list)
+    }
+
+    @Synchronized
+    fun deleteProject(id: Long) { saveAll(loadProjects().filterNot { it.id == id }) }
+
+    private fun saveAll(list: List<Project>) {
+        val arr = JSONArray()
+        list.forEach { arr.put(it.toJson()) }
+        file.writeText(arr.toString())
+    }
+}
+
+private fun Project.toJson(): JSONObject = JSONObject().apply {
+    put("id", id); put("name", name); put("createdAt", createdAt); put("updatedAt", updatedAt)
+    put("clips", JSONArray().apply { clips.forEach { c ->
+        put(JSONObject().apply {
+            put("id", c.id); put("uri", c.uri); put("startMs", c.startMs); put("endMs", c.endMs); put("durationMs", c.durationMs); put("label", c.label)
+        })
+    }})
+    put("effects", JSONArray().apply { effects.forEach { e ->
+        put(JSONObject().apply {
+            put("id", e.id); put("clipId", e.clipId); put("type", e.type)
+            put("intensity", e.intensity.toDouble()); put("angleX", e.angleX.toDouble()); put("angleY", e.angleY.toDouble()); put("angleZ", e.angleZ.toDouble())
+            put("scale", e.scale.toDouble()); put("speed", e.speed.toDouble())
+        })
+    }})
+    put("models3d", JSONArray().apply { models3d.forEach { m ->
+        put(JSONObject().apply {
+            put("id", m.id); put("clipId", m.clipId); put("name", m.name); put("filePath", m.filePath)
+            put("posX", m.posX.toDouble()); put("posY", m.posY.toDouble()); put("posZ", m.posZ.toDouble())
+            put("rotX", m.rotX.toDouble()); put("rotY", m.rotY.toDouble()); put("rotZ", m.rotZ.toDouble()); put("scale", m.scale.toDouble())
+        })
+    }})
+}
+
+private fun JSONObject.toProject(): Project {
+    val clipsArr = optJSONArray("clips") ?: JSONArray()
+    val effectsArr = optJSONArray("effects") ?: JSONArray()
+    val modelsArr = optJSONArray("models3d") ?: JSONArray()
+    return Project(
+        id = optLong("id"), name = optString("name"), createdAt = optLong("createdAt"), updatedAt = optLong("updatedAt"),
+        clips = (0 until clipsArr.length()).map { i -> clipsArr.getJSONObject(i).let { c ->
+            Clip(c.optLong("id"), c.optString("uri"), c.optLong("startMs"), c.optLong("endMs"), c.optLong("durationMs"), c.optString("label", "Клип"))
+        } },
+        effects = (0 until effectsArr.length()).map { i -> effectsArr.getJSONObject(i).let { e ->
+            EffectItem(e.optLong("id"), e.optLong("clipId"), e.optString("type"), e.optDouble("intensity", 0.5).toFloat(), e.optDouble("angleX", 0.0).toFloat(), e.optDouble("angleY", 0.0).toFloat(), e.optDouble("angleZ", 0.0).toFloat(), e.optDouble("scale", 1.0).toFloat(), e.optDouble("speed", 1.0).toFloat())
+        } },
+        models3d = (0 until modelsArr.length()).map { i -> modelsArr.getJSONObject(i).let { m ->
+            Model3DItem(m.optLong("id"), m.optLong("clipId"), m.optString("name"), m.optString("filePath"), m.optDouble("posX", 0.0).toFloat(), m.optDouble("posY", 0.0).toFloat(), m.optDouble("posZ", -2.0).toFloat(), m.optDouble("rotX", 0.0).toFloat(), m.optDouble("rotY", 0.0).toFloat(), m.optDouble("rotZ", 0.0).toFloat(), m.optDouble("scale", 1.0).toFloat())
+        } }
+    )
+}

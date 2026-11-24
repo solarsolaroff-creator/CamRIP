@@ -50,8 +50,10 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
 
     val media3 = "1.4.0"
     implementation("androidx.media3:media3-exoplayer:$media3")
@@ -60,7 +62,6 @@ dependencies {
     implementation("androidx.media3:media3-transformer:$media3")
     implementation("androidx.media3:media3-common:$media3")
 
-    // Real 3D (Filament via SceneView)
     implementation("io.github.sceneview:sceneview:2.2.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling")

@@ -1,0 +1,313 @@
+package com.vandal.camrip.ui.editor
+
+import android.content.ContentValues
+import android.content.Context
+import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Effect
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.effect.Brightness
+import androidx.media3.effect.Contrast
+import androidx.media3.effect.RgbFilter
+import androidx.media3.effect.ScaleAndRotateTransformation
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.transformer.Composition
+import androidx.media3.transformer.EditedMediaItem
+import androidx.media3.transformer.Effects
+import androidx.media3.transformer.ExportException
+import androidx.media3.transformer.ExportResult
+import androidx.media3.transformer.Transformer
+import androidx.media3.ui.PlayerView
+import com.vandal.camrip.data.Clip
+import com.vandal.camrip.data.EffectItem
+import com.vandal.camrip.data.Model3DItem
+import com.vandal.camrip.data.Project
+import com.vandal.camrip.data.ProjectRepository
+import com.vandal.camrip.data.SettingsRepository
+import io.github.sceneview.Scene
+import io.github.sceneview.math.Position
+import io.github.sceneview.math.Rotation
+import io.github.sceneview.node.ModelNode
+import io.github.sceneview.rememberEngine
+import io.github.sceneview.rememberModelLoader
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
+
+@androidx.annotation.OptIn(UnstableApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditorScreen(
+    projectId: Long,
+    repo: ProjectRepository,
+    settings: SettingsRepository,
+    appliedEffect: EffectItem?,
+    onBack: () -> Unit,
+    onOpenEffects: (Long) -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    var project by remember { mutableStateOf(repo.getProject(projectId) ?: Project(projectId, "Проект", System.currentTimeMillis(), System.currentTimeMillis())) }
+    var selectedClipId by remember { mutableStateOf(project.clips.firstOrNull()?.id) }
+    var showSheet by remember { mutableStateOf(false) }
+    var isPlaying by remember { mutableStateOf(false) }
+    var playheadMs by remember { mutableStateOf(0L) }
+    var durationMs by remember { mutableStateOf(0L) }
+    var exporting by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf("") }
+
+    val selectedClip = project.clips.firstOrNull { it.id == selectedClipId } ?: project.clips.firstOrNull()
+    val clipEffects = project.effects.filter { it.clipId == selectedClip?.id }
+    val clipModels = project.models3d.filter { it.clipId == selectedClip?.id }
+
+    LaunchedEffect(appliedEffect?.id) {
+        val e = appliedEffect ?: return@LaunchedEffect
+        project = project.copy(effects = project.effects.filterNot { it.clipId == e.clipId && it.type == e.type } + e)
+        repo.saveProject(project)
+        status = "Эффект применён: ${e.type}"
+    }
+
+    val previewEffects = remember(clipEffects) { clipEffects.flatMap { it.toMedia3Effects() } }
+
+    val player = remember(selectedClip?.uri, clipEffects.map { it.id to it.type to it.intensity }) {
+        selectedClip?.let {
+            ExoPlayer.Builder(context).build().apply {
+                setMediaItem(MediaItem.fromUri(Uri.parse(it.uri)))
+                setVideoEffects(previewEffects)
+                prepare()
+                playWhenReady = false
+            }
+        }
+    }
+    DisposableEffect(player) { onDispose { player?.release() } }
+
+    LaunchedEffect(player, isPlaying) {
+        player?.playWhenReady = isPlaying
+        while (isPlaying) {
+            playheadMs = player?.currentPosition ?: 0L
+            val d = player?.duration ?: 0L
+            if (d > 0) durationMs = d
+            delay(100)
+        }
+    }
+
+    fun saveNow() { repo.saveProject(project); project = repo.getProject(projectId) ?: project }
+
+    val pickVideo = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) {
+            val clip = Clip(id = System.currentTimeMillis(), uri = uri.toString(), label = "Клип ${project.clips.size + 1}")
+            project = project.copy(clips = project.clips + clip)
+            selectedClipId = clip.id
+            repo.saveProject(project)
+            status = "Видео добавлено"
+        }
+    }
+
+    val pickModel = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null && selectedClip != null) {
+            scope.launch {
+                val saved = withContext(Dispatchers.IO) { importModelToFilesDir(context, uri) }
+                if (saved != null) {
+                    val item = Model3DItem(
+                        id = System.currentTimeMillis(), clipId = selectedClip.id,
+                        name = saved.name, filePath = saved.absolutePath
+                    )
+                    project = project.copy(models3d = project.models3d + item)
+                    repo.saveProject(project)
+                    status = "3D модель импортирована: ${saved.name}"
+                } else status = "Не удалось импортировать 3D модель"
+            }
+        }
+    }
+
+    if (showSheet) {
+        ModalBottomSheet(onDismissRequest = { showSheet = false }) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Добавить", style = MaterialTheme.typography.titleLarge)
+                Button(onClick = { pickVideo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)); showSheet = false }, modifier = Modifier.fillMaxWidth()) { Text("Добавить видео") }
+                Button(onClick = { selectedClip?.let { onOpenEffects(it.id) }; showSheet = false }, enabled = selectedClip != null, modifier = Modifier.fillMaxWidth()) { Text("Эффекты") }
+                Button(onClick = { pickModel.launch("*/*"); showSheet = false }, enabled = selectedClip != null, modifier = Modifier.fillMaxWidth()) { Text("Импорт 3D-модели (.glb/.gltf)") }
+                Spacer(Modifier.height(20.dp))
+            }
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(project.name, maxLines = 1) },
+                navigationIcon = { IconButton(onClick = { repo.saveProject(project); onBack() }) { Icon(Icons.Default.ArrowBack, contentDescription = "Назад") } },
+                actions = {
+                    Button(onClick = {
+                        val clip = selectedClip ?: run { status = "Нет клипа для экспорта"; return@Button }
+                        exporting = true; status = "Экспорт..."
+                        exportClip(context, clip, clipEffects) { ok, msg ->
+                            exporting = false; status = msg
+                            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                        }
+                    }, enabled = !exporting) { Text("Экспорт") }
+                }
+            )
+        },
+        floatingActionButton = { FloatingActionButton(onClick = { showSheet = true }, shape = CircleShape) { Icon(Icons.Default.Add, contentDescription = "Добавить") } }
+    ) { pad ->
+        Column(Modifier.fillMaxSize().padding(pad)) {
+            Box(Modifier.fillMaxWidth().weight(1f).background(Color.Black)) {
+                if (player != null) {
+                    AndroidView(
+                        factory = { PlayerView(it).apply { this.player = player; useController = false } },
+                        update = { it.player = player },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    Model3DOverlay(models = clipModels)
+                } else {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Добавьте видео через +", color = Color.White) }
+                }
+            }
+
+            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                IconButton(onClick = { isPlaying = !isPlaying }) { Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = null) }
+                Text(formatMs(playheadMs) + " / " + formatMs(durationMs))
+            }
+            if (status.isNotBlank()) Text(status, modifier = Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+
+            Column(Modifier.fillMaxWidth().height(210.dp).background(MaterialTheme.colorScheme.surfaceVariant).padding(10.dp)) {
+                Text("Таймлайн", style = MaterialTheme.typography.labelLarge)
+                Spacer(Modifier.height(8.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(project.clips, key = { it.id }) { clip ->
+                        FilterChip(selected = clip.id == selectedClipId, onClick = { selectedClipId = clip.id }, label = { Text(clip.label) })
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Slider(value = playheadMs.toFloat(), onValueChange = { playheadMs = it.toLong(); player?.seekTo(playheadMs) }, valueRange = 0f..(durationMs.coerceAtLeast(1L).toFloat()))
+                Text("Эффекты: ${clipEffects.size} • 3D: ${clipModels.size}", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+@Composable
+fun Model3DOverlay(models: List<Model3DItem>) {
+    if (models.isEmpty()) return
+    val engine = rememberEngine()
+    val modelLoader = rememberModelLoader(engine)
+    var nodes by remember { mutableStateOf(listOf<ModelNode>()) }
+
+    LaunchedEffect(models.map { it.filePath + it.scale + it.rotY }) {
+        val loaded = withContext(Dispatchers.IO) {
+            models.mapNotNull { m ->
+                try {
+                    val f = File(m.filePath)
+                    if (!f.exists()) return@mapNotNull null
+                    modelLoader.createModelInstance(f)?.let { instance ->
+                        ModelNode(modelInstance = instance, scaleToUnits = m.scale.coerceAtLeast(0.1f)).apply {
+                            position = Position(m.posX, m.posY, m.posZ)
+                            rotation = Rotation(m.rotX, m.rotY, m.rotZ)
+                        }
+                    }
+                } catch (_: Exception) { null }
+            }
+        }
+        nodes = loaded
+    }
+
+    Scene(
+        modifier = Modifier.fillMaxSize(),
+        engine = engine,
+        modelLoader = modelLoader,
+        childNodes = nodes,
+        onViewCreated = { this.scene.skybox = null }
+    )
+}
+
+@androidx.annotation.OptIn(UnstableApi::class)
+fun EffectItem.toMedia3Effects(): List<Effect> = when (type) {
+    "grayscale" -> listOf(RgbFilter.createGrayscaleFilter())
+    "brightness" -> listOf(Brightness(intensity.coerceIn(-1f, 1f)))
+    "contrast" -> listOf(Contrast(intensity.coerceIn(-1f, 1f)))
+    "glitch" -> listOf(RgbFilter.createGrayscaleFilter(), Contrast((intensity * 0.8f).coerceIn(-1f, 1f)))
+    "chromatic" -> listOf(Contrast((intensity * 0.4f).coerceIn(-1f, 1f)))
+    "rotate3d", "perspective", "cube", "parallax" -> listOf(ScaleAndRotateTransformation.Builder().setRotationDegrees(angleZ).build())
+    "zoom" -> listOf(ScaleAndRotateTransformation.Builder().setScale(scale.coerceAtLeast(0.1f)).build())
+    "shake", "wave", "fisheye" -> emptyList() // preview-only placeholders; export-safe no-op
+    else -> emptyList()
+}
+
+@androidx.annotation.OptIn(UnstableApi::class)
+fun exportClip(context: Context, clip: Clip, effects: List<EffectItem>, onDone: (Boolean, String) -> Unit) {
+    val outFile = File(context.cacheDir, "export_${System.currentTimeMillis()}.mp4")
+    val videoEffects = effects.flatMap { it.toMedia3Effects() }
+    val edited = EditedMediaItem.Builder(MediaItem.fromUri(Uri.parse(clip.uri))).setEffects(Effects(emptyList(), videoEffects)).build()
+    val transformer = Transformer.Builder(context).addListener(object : Transformer.Listener {
+        override fun onCompleted(composition: Composition, exportResult: ExportResult) {
+            val ok = saveToGallery(context, outFile)
+            outFile.delete()
+            onDone(ok, if (ok) "Сохранено в Movies/CamRIP" else "Не удалось сохранить в галерею")
+        }
+        override fun onError(composition: Composition, exportResult: ExportResult, exportException: ExportException) {
+            outFile.delete()
+            onDone(false, "Ошибка экспорта: ${exportException.errorCodeName}: ${exportException.message ?: ""}")
+        }
+    }).build()
+    transformer.start(edited, outFile.absolutePath)
+}
+
+fun saveToGallery(context: Context, file: File): Boolean = try {
+    val values = ContentValues().apply {
+        put(MediaStore.Video.Media.DISPLAY_NAME, "CamRIP_${System.currentTimeMillis()}.mp4")
+        put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) { put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/CamRIP"); put(MediaStore.Video.Media.IS_PENDING, 1) }
+    }
+    val resolver = context.contentResolver
+    val uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values) ?: return false
+    resolver.openOutputStream(uri)?.use { out -> file.inputStream().use { it.copyTo(out) } } ?: return false
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) { values.clear(); values.put(MediaStore.Video.Media.IS_PENDING, 0); resolver.update(uri, values, null, null) }
+    true
+} catch (_: Exception) { false }
+
+fun importModelToFilesDir(context: Context, uri: Uri): File? = try {
+    val nameRaw = (uri.lastPathSegment ?: "model_${System.currentTimeMillis()}.glb").substringAfterLast('/')
+    val safe = nameRaw.replace(Regex("[^A-Za-z0-9._-]"), "_")
+    val name = when {
+        safe.endsWith(".glb", true) || safe.endsWith(".gltf", true) -> safe
+        else -> "$safe.glb"
+    }
+    val dir = File(context.filesDir, "models").apply { mkdirs() }
+    val out = File(dir, "${System.currentTimeMillis()}_$name")
+    context.contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(out).use { input.copyTo(it) } } ?: return null
+    out
+} catch (_: Exception) { null }
+
+fun formatMs(ms: Long): String {
+    val total = (ms / 1000).coerceAtLeast(0)
+    val m = total / 60; val s = total % 60
+    return "%02d:%02d".format(m, s)
+}
