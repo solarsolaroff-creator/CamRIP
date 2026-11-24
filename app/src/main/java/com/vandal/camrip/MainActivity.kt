@@ -56,6 +56,7 @@ import io.github.sceneview.rememberNode
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.*
 
 class MainActivity : ComponentActivity() {
@@ -222,6 +223,7 @@ fun CreateProjectDialog(onDismiss: () -> Unit, onCreate: (Project) -> Unit) {
 @Composable
 fun CamRipApp() {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var projects by remember { mutableStateOf(loadProjects(context)) }
     var currentProject by remember { mutableStateOf<Project?>(null) }
     if (currentProject == null) {
@@ -272,6 +274,7 @@ fun CamRipApp() {
     var items by remember { mutableStateOf(listOf<TimelineItem>()) }
     var selectedItemId by remember { mutableStateOf<Long?>(null) }
     var showEffectsScreen by remember { mutableStateOf(false) }
+    var loading3D by remember { mutableStateOf(false) }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
@@ -341,14 +344,25 @@ fun CamRipApp() {
                         engine = engine,
                         modelLoader = modelLoader,
                     )
+                    if (loading3D) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                    }
                 }
+                if (loading3D) Text("Загрузка 3D объектов...", color = Color(0xFFB0B0C0))
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     objects3d.forEach { name ->
                         Card(onClick = {
-                            val newItem = TimelineItem(type = "3d", label = name, startSec = playhead, color = objColor)
-                            items = items + newItem
-                            selectedItemId = newItem.id
-                            showEffectsScreen = false
+                            scope.launch {
+                                loading3D = true
+                                delay(700)
+                                val newItem = TimelineItem(type = "3d", label = name, startSec = playhead, color = objColor)
+                                items = items + newItem
+                                selectedItemId = newItem.id
+                                loading3D = false
+                                showEffectsScreen = false
+                            }
                         }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), modifier = Modifier.fillMaxWidth()) {
                             Row(Modifier.padding(14.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                 Text(name, fontWeight = FontWeight.SemiBold)
@@ -387,9 +401,7 @@ fun CamRipApp() {
                 if (videoUri != null) {
                     VideoPreview(player = exoPlayer, modifier = Modifier.fillMaxSize())
                 } else {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Вы пока не выбрали никакое видео", color = Color(0xFF8888AA))
-                    }
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { }
                 }
                 Canvas(Modifier.fillMaxSize()) {
                     items.forEach { item ->
@@ -419,6 +431,12 @@ fun CamRipApp() {
                             }
                         }
                     }
+                    // camera frame
+                    val m = 24f; val l = 40f; val st = Color.White.copy(alpha = 0.8f); val sw = 4f
+                    drawLine(st, Offset(m, m), Offset(m + l, m), sw); drawLine(st, Offset(m, m), Offset(m, m + l), sw)
+                    drawLine(st, Offset(size.width - m, m), Offset(size.width - m - l, m), sw); drawLine(st, Offset(size.width - m, m), Offset(size.width - m, m + l), sw)
+                    drawLine(st, Offset(m, size.height - m), Offset(m + l, size.height - m), sw); drawLine(st, Offset(m, size.height - m), Offset(m, size.height - m - l), sw)
+                    drawLine(st, Offset(size.width - m, size.height - m), Offset(size.width - m - l, size.height - m), sw); drawLine(st, Offset(size.width - m, size.height - m), Offset(size.width - m, size.height - m - l), sw)
                 }
             }
 
