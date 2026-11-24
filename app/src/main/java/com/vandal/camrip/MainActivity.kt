@@ -395,8 +395,8 @@ fun saveVideoToMovies(context: Context, file: File): Boolean {
             }
         }
         val resolver = context.contentResolver
-        val uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values) ?: return@try false
-        resolver.openOutputStream(uri)?.use { out -> file.inputStream().use { it.copyTo(out) } } ?: return@try false
+        val uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values) ?: return false
+        resolver.openOutputStream(uri)?.use { out -> file.inputStream().use { it.copyTo(out) } } ?: return false
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             values.clear(); values.put(MediaStore.Video.Media.IS_PENDING, 0); resolver.update(uri, values, null, null)
         }
@@ -409,7 +409,7 @@ fun importModelToFilesDir(context: Context, uri: Uri): SavedModel? {
         val name = (uri.lastPathSegment ?: "model.glb").substringAfterLast('/').let { if (it.endsWith(".glb") || it.endsWith(".gltf")) it else "$it.glb" }
         val dir = File(context.filesDir, "models").apply { mkdirs() }
         val out = File(dir, name)
-        context.contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(out).use { input.copyTo(it) } } ?: return@try null
+        context.contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(out).use { input.copyTo(it) } } ?: return null
         SavedModel(out.name, out)
     } catch (_: Exception) { null }
 }
