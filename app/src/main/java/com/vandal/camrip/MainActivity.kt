@@ -240,6 +240,7 @@ fun CamRipApp() {
     var selectedTab by remember { mutableStateOf(0) }
     var items by remember { mutableStateOf(listOf<TimelineItem>()) }
     var selectedItemId by remember { mutableStateOf<Long?>(null) }
+    var showEffectsScreen by remember { mutableStateOf(false) }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
@@ -259,6 +260,27 @@ fun CamRipApp() {
     }
 
     val selectedItem = items.firstOrNull { it.id == selectedItemId }
+
+    if (showEffectsScreen) {
+        Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { showEffectsScreen = false }) { Text("← Назад") }
+                Text("Эффекты", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            }
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                GlitchEffect.entries.forEach { e ->
+                    FilterChip(
+                        selected = effect == e,
+                        onClick = { effect = e; showEffectsScreen = false },
+                        label = { Text(e.title) },
+                        enabled = !exporting,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+        return
+    }
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
@@ -289,11 +311,8 @@ fun CamRipApp() {
                     Text("Видео дорожка / монтаж", fontWeight = FontWeight.SemiBold)
                     Text("Обрезка: ${trimRange.start.format1()}s — ${trimRange.endInclusive.format1()}s")
                     RangeSlider(value = trimRange, onValueChange = { trimRange = it }, valueRange = 0f..(durationMs / 1000f), enabled = !exporting)
-                    Text("Эффект", fontWeight = FontWeight.SemiBold)
-                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        GlitchEffect.entries.forEach { e ->
-                            FilterChip(selected = effect == e, onClick = { effect = e }, label = { Text(e.title) }, enabled = !exporting)
-                        }
+                    Button(onClick = { showEffectsScreen = true }, enabled = !exporting) {
+                        Text("Эффекты: ${effect.title}")
                     }
                 }
                 1 -> {
