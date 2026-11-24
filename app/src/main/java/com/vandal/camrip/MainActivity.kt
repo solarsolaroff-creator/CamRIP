@@ -80,7 +80,8 @@ enum class GlitchEffect(val title: String) {
     ZOOM_PULSE("Zoom Pulse"),
     CHROMA("Chroma"),
     BLUR_PULSE("Blur Pulse"),
-    EXPOSURE("Exposure")
+    EXPOSURE("Exposure"),
+    SWING("Swing")
 }
 
 enum class Easing(val title: String) {
@@ -720,6 +721,7 @@ fun exportVideo(context: Context, uri: Uri, startSec: Double, endSec: Double, ef
         GlitchEffect.CHROMA -> "rgbashift=rh='12*${amp}':gh='-8*${amp}':bh='6*${amp}',eq=saturation='1+0.3*${amp}'"
         GlitchEffect.BLUR_PULSE -> "boxblur=luma_radius='min(20,2+10*abs(sin(t*3))*${amp})':luma_power=1"
         GlitchEffect.EXPOSURE -> "eq=brightness='0.08*sin(t*4)*${amp}':contrast='1+0.15*${amp}'"
+        GlitchEffect.SWING -> "rotate='8*${amp}*sin(2*PI*2*t)*PI/180':fillcolor=black@0:ow=iw:oh=ih"
     }
     val vf = if (subtitle.isBlank()) filter else {
         val escaped = subtitle
