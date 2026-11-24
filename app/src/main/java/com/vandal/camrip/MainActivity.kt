@@ -272,20 +272,45 @@ fun CamRipApp() {
     val selectedItem = items.firstOrNull { it.id == selectedItemId }
 
     if (showEffectsScreen) {
+        var effectTab by remember { mutableStateOf(0) }
+        val effectTabs = listOf("Эффекты", "3D")
+        val objects3d = listOf("Cube", "Sphere", "Pyramid", "Cylinder", "Cone", "Torus", "Ring", "Plane", "Capsule", "Icosphere", "Donut", "Star 3D", "Heart 3D", "Text 3D", "Phone 3D", "Card 3D", "Arrow 3D", "Lightning 3D")
         Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = { showEffectsScreen = false }) { Text("← Назад") }
                 Text("Эффекты", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             }
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                GlitchEffect.entries.forEach { e ->
-                    FilterChip(
-                        selected = effect == e,
-                        onClick = { effect = e; showEffectsScreen = false },
-                        label = { Text(e.title) },
-                        enabled = !exporting,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+            TabRow(selectedTabIndex = effectTab, containerColor = MaterialTheme.colorScheme.surface) {
+                effectTabs.forEachIndexed { i, t -> Tab(selected = effectTab == i, onClick = { effectTab = i }, text = { Text(t) }) }
+            }
+            if (effectTab == 0) {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    GlitchEffect.entries.forEach { e ->
+                        FilterChip(
+                            selected = effect == e,
+                            onClick = { effect = e; showEffectsScreen = false },
+                            label = { Text(e.title) },
+                            enabled = !exporting,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            } else {
+                Text("3D объекты (превью)", color = Color(0xFFB0B0C0))
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    objects3d.forEach { name ->
+                        Card(onClick = {
+                            val newItem = TimelineItem(type = "3d", label = name, startSec = playhead, color = objColor)
+                            items = items + newItem
+                            selectedItemId = newItem.id
+                            showEffectsScreen = false
+                        }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), modifier = Modifier.fillMaxWidth()) {
+                            Row(Modifier.padding(14.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Text(name, fontWeight = FontWeight.SemiBold)
+                                Text("3D", color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -322,13 +347,31 @@ fun CamRipApp() {
                     }
                 }
                 Canvas(Modifier.fillMaxSize()) {
-                    items.filter { it.shape != null }.forEach { item ->
-                        withTransform({
-                            translate(left = item.x, top = item.y)
-                            rotate(item.rotation, pivot = center)
-                            scale(item.scale, item.scale, pivot = center)
-                        }) {
-                            drawM3Shape(item.shape!!, item.color, item.color.copy(alpha = 0.22f))
+                    items.forEach { item ->
+                        if (item.shape != null) {
+                            withTransform({
+                                translate(left = item.x, top = item.y)
+                                rotate(item.rotation, pivot = center)
+                                scale(item.scale, item.scale, pivot = center)
+                            }) {
+                                drawM3Shape(item.shape!!, item.color, item.color.copy(alpha = 0.22f))
+                            }
+                        } else if (item.type == "3d") {
+                            withTransform({
+                                translate(left = item.x, top = item.y)
+                                rotate(item.rotation, pivot = center)
+                                scale(item.scale, item.scale, pivot = center)
+                            }) {
+                                val s = size.minDimension * 0.18f
+                                val c = center
+                                drawRect(item.color.copy(alpha = 0.25f), topLeft = Offset(c.x-s, c.y-s), size = Size(s*2, s*2))
+                                drawRect(item.color, topLeft = Offset(c.x-s, c.y-s), size = Size(s*2, s*2), style = Stroke(5f))
+                                drawLine(item.color, Offset(c.x-s, c.y-s), Offset(c.x-s*0.5f, c.y-s*1.4f), strokeWidth = 5f)
+                                drawLine(item.color, Offset(c.x+s, c.y-s), Offset(c.x+s*1.5f, c.y-s*1.4f), strokeWidth = 5f)
+                                drawLine(item.color, Offset(c.x+s, c.y+s), Offset(c.x+s*1.5f, c.y+s*0.6f), strokeWidth = 5f)
+                                drawLine(item.color, Offset(c.x-s*0.5f, c.y-s*1.4f), Offset(c.x+s*1.5f, c.y-s*1.4f), strokeWidth = 5f)
+                                drawLine(item.color, Offset(c.x+s*1.5f, c.y-s*1.4f), Offset(c.x+s*1.5f, c.y+s*0.6f), strokeWidth = 5f)
+                            }
                         }
                     }
                 }
