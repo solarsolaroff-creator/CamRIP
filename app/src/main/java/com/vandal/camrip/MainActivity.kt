@@ -258,6 +258,14 @@ fun CamRipApp() {
     var scaleMode by remember { mutableStateOf(ScaleMode.NONE) }
     var scaleValue by remember { mutableStateOf(1f) }
 
+    val exoPlayer = remember(videoUri) {
+        videoUri?.let { ExoPlayer.Builder(context).build().apply { setMediaItem(MediaItem.fromUri(it)); prepare(); playWhenReady = false } }
+    }
+    DisposableEffect(exoPlayer) { onDispose { exoPlayer?.release() } }
+
+    LaunchedEffect(isPlaying) { exoPlayer?.playWhenReady = isPlaying && !playReverse }
+    LaunchedEffect(playhead) { if (!isPlaying) exoPlayer?.seekTo((playhead * 1000).toLong()) }
+
     val tabs = listOf("Видео", "Медиа", "Аудио", "Фигуры", "Вектор")
     var selectedTab by remember { mutableStateOf(0) }
     var items by remember { mutableStateOf(listOf<TimelineItem>()) }
@@ -287,9 +295,14 @@ fun CamRipApp() {
         while (isPlaying) {
             delay(100)
             val maxSec = (durationMs / 1000f)
-            val delta = if (playReverse) -0.1f else 0.1f
-            playhead = (playhead + delta).coerceIn(0f, maxSec)
-            if (playhead >= maxSec || playhead <= 0f) isPlaying = false
+            if (playReverse) {
+                playhead = (playhead - 0.1f).coerceAtLeast(0f)
+                if (playhead <= 0f) isPlaying = false
+            } else {
+                val p = exoPlayer?.currentPosition?.toFloat()?.div(1000f)
+                playhead = (p ?: (playhead + 0.1f)).coerceIn(0f, maxSec)
+                if (playhead >= maxSec) isPlaying = false
+            }
         }
     }
 
@@ -371,7 +384,7 @@ fun CamRipApp() {
                 Modifier.fillMaxWidth().aspectRatio(aspect).background(bg, RoundedCornerShape(16.dp))
             ) {
                 if (videoUri != null) {
-                    VideoPreview(uri = videoUri!!, modifier = Modifier.fillMaxSize())
+                    VideoPreview(player = exoPlayer, modifier = Modifier.fillMaxSize())
                 } else {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text("Вы пока не выбрали никакое видео", color = Color(0xFF8888AA))
@@ -728,14 +741,10 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.drawM3Shape(shape: M3Shape,
 }
 
 @Composable
-fun VideoPreview(uri: Uri, modifier: Modifier = Modifier.fillMaxWidth().height(260.dp).background(Color.Black, RoundedCornerShape(12.dp))) {
-    val context = LocalContext.current
-    val exoPlayer = remember(uri) {
-        ExoPlayer.Builder(context).build().apply { setMediaItem(MediaItem.fromUri(uri)); prepare(); playWhenReady = false }
-    }
-    DisposableEffect(exoPlayer) { onDispose { exoPlayer.release() } }
+fun VideoPreview(player: ExoPlayer?, modifier: Modifier = Modifier.fillMaxWidth().height(260.dp).background(Color.Black, RoundedCornerShape(12.dp))) {
     AndroidView(
-        factory = { ctx -> PlayerView(ctx).apply { player = exoPlayer; useController = true } },
+        factory = { ctx -> PlayerView(ctx).apply { this.player = player; useController = true } },
+        update = { it.player = player },
         modifier = modifier
     )
 }
