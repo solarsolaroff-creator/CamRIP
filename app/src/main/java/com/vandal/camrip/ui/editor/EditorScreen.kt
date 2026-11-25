@@ -30,7 +30,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
@@ -94,6 +93,7 @@ fun EditorScreen(
     var selectedItem by remember { mutableStateOf<Pair<String, Long>?>(null) } // type,id
     var groupPick by remember { mutableStateOf<Pair<String, Long>?>(null) }
     var contextMenuItem by remember { mutableStateOf<Pair<String, Long>?>(null) }
+    val latestProject by rememberUpdatedState(project)
 
     val selectedClip = project.clips.firstOrNull { it.id == selectedClipId } ?: project.clips.firstOrNull()
     val clipEffects = project.effects.filter { it.clipId == selectedClip?.id }
@@ -209,7 +209,7 @@ fun EditorScreen(
                             }
                             .pointerInput(selectedClip?.id) {
                                 detectDragGestures(
-                                    onDragEnd = { repo.saveProject(project) },
+                                    onDragEnd = { repo.saveProject(latestProject) },
                                     onDrag = { change, dragAmount ->
                                         change.consume()
                                         val c = selectedClip ?: return@detectDragGestures
@@ -353,13 +353,16 @@ fun EditorScreen(
                     dismissButton = {
                         Row {
                             TextButton(onClick = {
-                                project = when (type) {
+                                val newProject = when (type) {
                                     "clip" -> project.copy(clips = project.clips.filterNot { it.id == id }, effects = project.effects.filterNot { it.clipId == id }, models3d = project.models3d.filterNot { it.clipId == id })
                                     "effect" -> project.copy(effects = project.effects.filterNot { it.id == id })
                                     "model3d" -> project.copy(models3d = project.models3d.filterNot { it.id == id })
                                     else -> project
                                 }
-                                repo.saveProject(project); contextMenuItem = null; status = "Удалено"
+                                project = newProject
+                                if (type == "clip" && selectedClipId == id) selectedClipId = newProject.clips.firstOrNull()?.id
+                                if (selectedItem == (type to id)) selectedItem = null
+                                repo.saveProject(newProject); contextMenuItem = null; status = "Удалено"
                             }) { Text("Удалить") }
                             TextButton(onClick = { contextMenuItem = null }) { Text("Закрыть") }
                         }
@@ -483,38 +486,7 @@ fun formatMs(ms: Long): String {
 
 @Composable
 fun rememberAgslPreviewModifier(effectTypes: List<String>, intensity: Float): Modifier {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return Modifier
-    val type = effectTypes.firstOrNull() ?: return Modifier
-    val shaderSrc = when (type) {
-        "chromatic", "glitch" -> """
-            uniform shader content;
-            uniform float intensity;
-            half4 main(float2 coord) {
-                float off = intensity * 12.0;
-                half4 r = content.eval(coord + float2(off, 0.0));
-                half4 g = content.eval(coord);
-                half4 b = content.eval(coord - float2(off, 0.0));
-                return half4(r.r, g.g, b.b, g.a);
-            }
-        """.trimIndent()
-        "wave", "fisheye" -> """
-            uniform shader content;
-            uniform float intensity;
-            uniform float2 size;
-            half4 main(float2 coord) {
-                float2 uv = coord / size;
-                float2 c = uv - 0.5;
-                float d = length(c);
-                float f = 1.0 + intensity * d * d;
-                float2 nc = c * f + 0.5;
-                return content.eval(nc * size);
-            }
-        """.trimIndent()
-        else -> return Modifier
-    }
-    val shader = remember(shaderSrc) { android.graphics.RuntimeShader(shaderSrc) }
-    shader.setFloatUniform("intensity", intensity.coerceIn(0f, 1f))
-    if (shaderSrc.contains("size")) shader.setFloatUniform("size", 1080f, 1920f)
-    val effect = android.graphics.RenderEffect.createRuntimeShaderEffect(shader, "content")
-    return Modifier.graphicsLayer { renderEffect = effect.asComposeRenderEffect() }
+    // AGSL RenderEffect preview is API 33+; Compose BOM 2024.06.00 (UI 1.6.x) lacks asComposeRenderEffect().
+    // Keep as safe no-op here; raw AGSL shaders are in res/raw for future integration.
+    return Modifier
 }
