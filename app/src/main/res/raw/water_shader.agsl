@@ -1,0 +1,42 @@
+// Adapted from JumpingKeyCaps/DynamicVisualEffectsAGSL (AGSL, API 33+ preview)
+uniform shader inputShader;
+uniform float2 uResolution;
+uniform float uTime;
+const int MAX_WAVES = 20;
+uniform int uNumWaves;
+uniform float2 uWaveOrigins[MAX_WAVES];
+uniform float uWaveAmplitudes[MAX_WAVES];
+uniform float uWaveFrequencies[MAX_WAVES];
+uniform float uWaveSpeeds[MAX_WAVES];
+uniform float uWaveStartTimes[MAX_WAVES];
+uniform float uGlobalDamping;
+uniform float uMinAmplitudeThreshold;
+float PI = 3.141592653589793;
+half4 main(float2 fragCoord) {
+    float2 point = fragCoord;
+    float2 totalOffset = float2(0.0, 0.0);
+    for (int i = 0; i < MAX_WAVES; i++) {
+        if (i >= uNumWaves) continue;
+        float waveStartTime = uWaveStartTimes[i];
+        float waveAmplitude = uWaveAmplitudes[i];
+        float waveFrequency = uWaveFrequencies[i];
+        float waveSpeed = uWaveSpeeds[i];
+        float2 waveOrigin = uWaveOrigins[i];
+        float elapsed = uTime - waveStartTime;
+        float2 diff = point - waveOrigin;
+        float distance = length(diff);
+        float waveFront = waveSpeed * elapsed;
+        float relDist = distance - waveFront;
+        if (relDist > 0.0) { continue; }
+        float omega = waveFrequency * 2.0 * PI;
+        float k = omega / waveSpeed;
+        float currentAmplitude = waveAmplitude * pow(uGlobalDamping, elapsed);
+        if (currentAmplitude < uMinAmplitudeThreshold) { continue; }
+        float phase = k * distance - omega * elapsed;
+        float waveEffect = sin(phase) * currentAmplitude;
+        float2 direction = float2(0.0, 0.0);
+        if (distance > 0.0) { direction = diff / distance; }
+        totalOffset += direction * waveEffect;
+    }
+    return inputShader.eval(fragCoord + totalOffset);
+}
