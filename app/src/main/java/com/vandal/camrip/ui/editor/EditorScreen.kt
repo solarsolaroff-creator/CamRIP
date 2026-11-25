@@ -30,6 +30,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
@@ -194,9 +195,11 @@ fun EditorScreen(
             Box(Modifier.fillMaxWidth().weight(1f).background(Color.Black)) {
                 if (player != null) {
                     val clipTransform = selectedClip
+                    val agslMod = rememberAgslPreviewModifier(clipEffects.map { it.type }, clipEffects.firstOrNull()?.intensity ?: 0.5f)
                     Box(
                         Modifier
                             .fillMaxSize()
+                            .then(agslMod)
                             .graphicsLayer {
                                 translationX = clipTransform?.offsetX ?: 0f
                                 translationY = clipTransform?.offsetY ?: 0f
@@ -460,4 +463,42 @@ fun formatMs(ms: Long): String {
     val total = (ms / 1000).coerceAtLeast(0)
     val m = total / 60; val s = total % 60
     return "%02d:%02d".format(m, s)
+}
+
+@Composable
+fun rememberAgslPreviewModifier(effectTypes: List<String>, intensity: Float): Modifier {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return Modifier
+    val type = effectTypes.firstOrNull() ?: return Modifier
+    val shaderSrc = when (type) {
+        "chromatic", "glitch" -> """
+            uniform shader content;
+            uniform float intensity;
+            half4 main(float2 coord) {
+                float off = intensity * 12.0;
+                half4 r = content.eval(coord + float2(off, 0.0));
+                half4 g = content.eval(coord);
+                half4 b = content.eval(coord - float2(off, 0.0));
+                return half4(r.r, g.g, b.b, g.a);
+            }
+        """.trimIndent()
+        "wave", "fisheye" -> """
+            uniform shader content;
+            uniform float intensity;
+            uniform float2 size;
+            half4 main(float2 coord) {
+                float2 uv = coord / size;
+                float2 c = uv - 0.5;
+                float d = length(c);
+                float f = 1.0 + intensity * d * d;
+                float2 nc = c * f + 0.5;
+                return content.eval(nc * size);
+            }
+        """.trimIndent()
+        else -> return Modifier
+    }
+    val shader = remember(shaderSrc) { android.graphics.RuntimeShader(shaderSrc) }
+    shader.setFloatUniform("intensity", intensity.coerceIn(0f, 1f))
+    if (shaderSrc.contains("size")) shader.setFloatUniform("size", 1080f, 1920f)
+    val effect = android.graphics.RenderEffect.createRuntimeShaderEffect(shader, "content")
+    return Modifier.graphicsLayer { renderEffect = effect.asComposeRenderEffect() }
 }
