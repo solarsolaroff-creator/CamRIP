@@ -12,6 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -29,6 +30,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
@@ -190,11 +193,36 @@ fun EditorScreen(
         Column(Modifier.fillMaxSize().padding(pad)) {
             Box(Modifier.fillMaxWidth().weight(1f).background(Color.Black)) {
                 if (player != null) {
-                    AndroidView(
-                        factory = { PlayerView(it).apply { this.player = player; useController = false } },
-                        update = { it.player = player },
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    val clipTransform = selectedClip
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                translationX = clipTransform?.offsetX ?: 0f
+                                translationY = clipTransform?.offsetY ?: 0f
+                                scaleX = clipTransform?.scale ?: 1f
+                                scaleY = clipTransform?.scale ?: 1f
+                                rotationZ = clipTransform?.rotation ?: 0f
+                            }
+                            .pointerInput(selectedClip?.id) {
+                                detectDragGestures(
+                                    onDragEnd = { repo.saveProject(project) },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        val c = selectedClip ?: return@detectDragGestures
+                                        project = project.copy(clips = project.clips.map {
+                                            if (it.id == c.id) it.copy(offsetX = it.offsetX + dragAmount.x, offsetY = it.offsetY + dragAmount.y) else it
+                                        })
+                                    }
+                                )
+                            }
+                    ) {
+                        AndroidView(
+                            factory = { PlayerView(it).apply { this.player = player; useController = false } },
+                            update = { it.player = player },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                     Model3DOverlay(models = clipModels)
                 } else {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Добавьте видео через +", color = Color.White) }
@@ -206,6 +234,22 @@ fun EditorScreen(
                 Text(formatMs(playheadMs) + " / " + formatMs(durationMs))
             }
             if (status.isNotBlank()) Text(status, modifier = Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+
+            selectedClip?.let { c ->
+                Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Видео", style = MaterialTheme.typography.labelSmall)
+                    TextButton(onClick = {
+                        project = project.copy(clips = project.clips.map { if (it.id == c.id) it.copy(scale = (it.scale - 0.1f).coerceAtLeast(0.2f)) else it }); repo.saveProject(project)
+                    }) { Text("-") }
+                    Text("${"%.1f".format(c.scale)}x", style = MaterialTheme.typography.labelSmall)
+                    TextButton(onClick = {
+                        project = project.copy(clips = project.clips.map { if (it.id == c.id) it.copy(scale = (it.scale + 0.1f).coerceAtMost(3f)) else it }); repo.saveProject(project)
+                    }) { Text("+") }
+                    TextButton(onClick = {
+                        project = project.copy(clips = project.clips.map { if (it.id == c.id) it.copy(offsetX = 0f, offsetY = 0f, scale = 1f, rotation = 0f) else it }); repo.saveProject(project)
+                    }) { Text("Сброс") }
+                }
+            }
 
             Column(
                 Modifier.fillMaxWidth().heightIn(min = 230.dp, max = 390.dp).background(MaterialTheme.colorScheme.surfaceVariant).verticalScroll(rememberScrollState()).padding(10.dp),
@@ -362,7 +406,11 @@ fun EffectItem.toMedia3Effects(): List<Effect> = when (type) {
 @androidx.annotation.OptIn(UnstableApi::class)
 fun exportClip(context: Context, clip: Clip, effects: List<EffectItem>, onDone: (Boolean, String) -> Unit) {
     val outFile = File(context.cacheDir, "export_${System.currentTimeMillis()}.mp4")
-    val videoEffects = effects.flatMap { it.toMedia3Effects() }
+    val baseEffects = mutableListOf<Effect>()
+    if (clip.scale != 1f || clip.rotation != 0f) {
+        baseEffects += ScaleAndRotateTransformation.Builder().setScale(clip.scale.coerceAtLeast(0.1f), clip.scale.coerceAtLeast(0.1f)).setRotationDegrees(clip.rotation).build()
+    }
+    val videoEffects = baseEffects + effects.flatMap { it.toMedia3Effects() }
     val edited = EditedMediaItem.Builder(MediaItem.fromUri(Uri.parse(clip.uri))).setEffects(Effects(emptyList(), videoEffects)).build()
     val transformer = Transformer.Builder(context).addListener(object : Transformer.Listener {
         override fun onCompleted(composition: Composition, exportResult: ExportResult) {

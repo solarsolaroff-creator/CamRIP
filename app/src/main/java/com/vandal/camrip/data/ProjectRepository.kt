@@ -44,6 +44,7 @@ private fun Project.toJson(): JSONObject = JSONObject().apply {
         put(JSONObject().apply {
             put("id", c.id); put("uri", c.uri); put("startMs", c.startMs); put("endMs", c.endMs); put("durationMs", c.durationMs); put("label", c.label)
             put("groupId", c.groupId ?: "")
+            put("offsetX", c.offsetX.toDouble()); put("offsetY", c.offsetY.toDouble()); put("scale", c.scale.toDouble()); put("rotation", c.rotation.toDouble())
         })
     }})
     put("effects", JSONArray().apply { effects.forEach { e ->
@@ -70,7 +71,7 @@ private fun JSONObject.toProject(): Project {
     return Project(
         id = optLong("id"), name = optString("name"), createdAt = optLong("createdAt"), updatedAt = optLong("updatedAt"),
         clips = (0 until clipsArr.length()).map { i -> clipsArr.getJSONObject(i).let { c ->
-            Clip(c.optLong("id"), c.optString("uri"), c.optLong("startMs"), c.optLong("endMs"), c.optLong("durationMs"), c.optString("label", "Клип"), c.optString("groupId").ifBlank { null })
+            Clip(c.optLong("id"), c.optString("uri"), c.optLong("startMs"), c.optLong("endMs"), c.optLong("durationMs"), c.optString("label", "Клип"), c.optString("groupId").ifBlank { null }, c.optDouble("offsetX", 0.0).toFloat(), c.optDouble("offsetY", 0.0).toFloat(), c.optDouble("scale", 1.0).toFloat(), c.optDouble("rotation", 0.0).toFloat())
         } },
         effects = (0 until effectsArr.length()).map { i -> effectsArr.getJSONObject(i).let { e ->
             EffectItem(e.optLong("id"), e.optLong("clipId"), e.optString("type"), e.optDouble("intensity", 0.5).toFloat(), e.optDouble("angleX", 0.0).toFloat(), e.optDouble("angleY", 0.0).toFloat(), e.optDouble("angleZ", 0.0).toFloat(), e.optDouble("scale", 1.0).toFloat(), e.optDouble("speed", 1.0).toFloat(), e.optString("groupId").ifBlank { null })

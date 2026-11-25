@@ -17,7 +17,11 @@ data class Clip(
     val endMs: Long = 0L,
     val durationMs: Long = 0L,
     val label: String = "Клип",
-    val groupId: String? = null
+    val groupId: String? = null,
+    val offsetX: Float = 0f,
+    val offsetY: Float = 0f,
+    val scale: Float = 1f,
+    val rotation: Float = 0f
 )
 
 data class EffectItem(
