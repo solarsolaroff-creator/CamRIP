@@ -14,6 +14,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyRow
@@ -255,90 +256,96 @@ fun EditorScreen(
             }
 
             Column(
-                Modifier.fillMaxWidth().heightIn(min = 230.dp, max = 390.dp).background(MaterialTheme.colorScheme.surfaceVariant).verticalScroll(rememberScrollState()).padding(10.dp),
+                Modifier.fillMaxWidth().heightIn(min = 260.dp, max = 430.dp).background(MaterialTheme.colorScheme.surfaceVariant).padding(10.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Видеодорожка (Video Track) / Таймлайн", style = MaterialTheme.typography.labelLarge)
-                Slider(value = playheadMs.toFloat(), onValueChange = { playheadMs = it.toLong(); player?.seekTo(playheadMs) }, valueRange = 0f..(durationMs.coerceAtLeast(1L).toFloat()))
+                Text("Видеодорожка (Video Track)", style = MaterialTheme.typography.labelLarge)
+                val totalMs = durationMs.coerceAtLeast(10_000L)
+                val pxPerMs = 0.12f
+                val timelineWidth = (totalMs * pxPerMs).dp
+                val dens = androidx.compose.ui.platform.LocalDensity.current.density
+
+                // ruler
+                Box(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+                    Column {
+                        Row(Modifier.width(timelineWidth).height(24.dp)) {
+                            val marks = (totalMs / 1000L).toInt().coerceAtLeast(1)
+                            for (s in 0..marks) {
+                                Box(Modifier.width((1000 * pxPerMs).dp).height(24.dp)) {
+                                    Text("${s}s", style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                        }
+                        Box(Modifier.width(timelineWidth).height(170.dp).background(Color(0xFF101018), RoundedCornerShape(10.dp))) {
+                            // grid
+                            androidx.compose.foundation.Canvas(Modifier.matchParentSize()) {
+                                val step = 1000f * pxPerMs * density
+                                var x = 0f
+                                while (x < size.width) { drawLine(Color(0xFF2A2A3A), androidx.compose.ui.geometry.Offset(x, 0f), androidx.compose.ui.geometry.Offset(x, size.height), 1f); x += step }
+                                val ph = playheadMs * pxPerMs * density
+                                drawLine(Color(0xFFFF4FD8), androidx.compose.ui.geometry.Offset(ph, 0f), androidx.compose.ui.geometry.Offset(ph, size.height), 3f)
+                            }
+                            Column(Modifier.matchParentSize().padding(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                // video track
+                                Text("Видео", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                                Row(Modifier.height(34.dp)) {
+                                    project.clips.forEachIndexed { idx, clip ->
+                                        val w = ((clip.durationMs.takeIf { it > 0 } ?: 4000L) * pxPerMs).dp
+                                        val sel = selectedItem == ("clip" to clip.id) || selectedClipId == clip.id
+                                        Box(
+                                            Modifier.padding(end = 4.dp).width(w).fillMaxHeight().background(if (sel) MaterialTheme.colorScheme.primary else Color(0xFF3A6EA5), RoundedCornerShape(8.dp))
+                                                .combinedClickable(onClick = { selectedClipId = clip.id; selectedItem = "clip" to clip.id }, onLongClick = { contextMenuItem = "clip" to clip.id })
+                                                .pointerInput(clip.id) { detectDragGestures { c, drag -> c.consume(); project = moveTimelineItem(project, "clip", clip.id, (drag.x / (pxPerMs * dens)).toLong()) } },
+                                            contentAlignment = Alignment.Center
+                                        ) { Text(clip.label, maxLines = 1, style = MaterialTheme.typography.labelSmall, color = Color.White) }
+                                    }
+                                }
+                                // effects track
+                                Text("Эффекты", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                                Row(Modifier.height(30.dp)) {
+                                    clipEffects.forEach { e ->
+                                        val left = (e.startMs.coerceAtLeast(0L) * pxPerMs).dp
+                                        val sel = selectedItem == ("effect" to e.id)
+                                        if (left.value > 0f) Spacer(Modifier.width(left))
+                                        Box(
+                                            Modifier.width(88.dp).fillMaxHeight().background(if (sel) MaterialTheme.colorScheme.secondary else Color(0xFF7A4FA5), RoundedCornerShape(8.dp))
+                                                .combinedClickable(onClick = { selectedItem = "effect" to e.id }, onLongClick = { contextMenuItem = "effect" to e.id })
+                                                .pointerInput(e.id) { detectDragGestures { c, drag -> c.consume(); project = moveTimelineItem(project, "effect", e.id, (drag.x / (pxPerMs * dens)).toLong()); repo.saveProject(project) } },
+                                            contentAlignment = Alignment.Center
+                                        ) { Text(e.type, maxLines = 1, style = MaterialTheme.typography.labelSmall, color = Color.White) }
+                                    }
+                                }
+                                // 3d track
+                                Text("3D", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                                Row(Modifier.height(30.dp)) {
+                                    clipModels.forEach { m ->
+                                        val left = (m.startMs.coerceAtLeast(0L) * pxPerMs).dp
+                                        val sel = selectedItem == ("model3d" to m.id)
+                                        if (left.value > 0f) Spacer(Modifier.width(left))
+                                        Box(
+                                            Modifier.width(88.dp).fillMaxHeight().background(if (sel) MaterialTheme.colorScheme.tertiary else Color(0xFF2F8A6B), RoundedCornerShape(8.dp))
+                                                .combinedClickable(onClick = { selectedItem = "model3d" to m.id; selectedModel3dId = m.id }, onLongClick = { contextMenuItem = "model3d" to m.id })
+                                                .pointerInput(m.id) { detectDragGestures { c, drag -> c.consume(); project = moveTimelineItem(project, "model3d", m.id, (drag.x / (pxPerMs * dens)).toLong()); repo.saveProject(project) } },
+                                            contentAlignment = Alignment.Center
+                                        ) { Text(m.name.take(8), maxLines = 1, style = MaterialTheme.typography.labelSmall, color = Color.White) }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
 
                 selectedItem?.let { (type, id) ->
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("Переместить:", style = MaterialTheme.typography.bodySmall)
-                        TextButton(onClick = {
-                            project = moveTimelineItem(project, type, id, -500)
-                            repo.saveProject(project)
-                        }) { Text("←") }
-                        TextButton(onClick = {
-                            project = moveTimelineItem(project, type, id, 500)
-                            repo.saveProject(project)
-                        }) { Text("→") }
-                        val label = when (type) {
-                            "clip" -> project.clips.firstOrNull { it.id == id }?.label ?: "клип"
-                            "effect" -> project.effects.firstOrNull { it.id == id }?.type ?: "эффект"
-                            "model3d" -> project.models3d.firstOrNull { it.id == id }?.name ?: "3D"
-                            else -> type
-                        }
-                        Text(label, style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = { project = moveTimelineItem(project, type, id, -500); repo.saveProject(project) }) { Text("←") }
+                        TextButton(onClick = { project = moveTimelineItem(project, type, id, 500); repo.saveProject(project) }) { Text("→") }
                     }
-                }
-
-                Text("Видео", style = MaterialTheme.typography.titleSmall)
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(project.clips, key = { it.id }) { clip ->
-                        val sel = selectedItem == ("clip" to clip.id)
-                        Box(Modifier.combinedClickable(onClick = { selectedClipId = clip.id; selectedItem = "clip" to clip.id }, onLongClick = { contextMenuItem = "clip" to clip.id })) {
-                            FilterChip(selected = sel || clip.id == selectedClipId, onClick = { selectedClipId = clip.id; selectedItem = "clip" to clip.id }, label = { Text(clip.label + (clip.groupId?.let { " [G]" } ?: "")) })
-                        }
-                    }
-                }
-
-                Text("Эффекты на дорожке", style = MaterialTheme.typography.titleSmall)
-                if (clipEffects.isEmpty()) Text("Нет эффектов — добавьте через +", style = MaterialTheme.typography.bodySmall)
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(clipEffects, key = { it.id }) { e ->
-                        val sel = selectedItem == ("effect" to e.id)
-                        Box(Modifier.combinedClickable(onClick = { selectedItem = "effect" to e.id }, onLongClick = { contextMenuItem = "effect" to e.id })) {
-                            FilterChip(selected = sel, onClick = { selectedItem = "effect" to e.id }, label = { Text("${e.type} @${formatMs(e.startMs)}${e.groupId?.let { " [G]" } ?: ""}") })
-                        }
-                    }
-                }
-
-                Text("3D / объекты", style = MaterialTheme.typography.titleSmall)
-                if (clipModels.isEmpty()) Text("Нет 3D-объектов — импорт через +", style = MaterialTheme.typography.bodySmall)
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(clipModels, key = { it.id }) { m ->
-                        val sel = selectedItem == ("model3d" to m.id)
-                        Box(Modifier.combinedClickable(onClick = { selectedItem = "model3d" to m.id; selectedModel3dId = m.id }, onLongClick = { contextMenuItem = "model3d" to m.id })) {
-                            FilterChip(selected = sel, onClick = { selectedItem = "model3d" to m.id; selectedModel3dId = m.id }, label = { Text("${m.name.take(8)} @${formatMs(m.startMs)}${m.groupId?.let { " [G]" } ?: ""}") })
-                        }
-                    }
-                }
-
-                if (groupPick != null) Text("Выбран для группы: ${groupPick!!.first}#${groupPick!!.second}", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
-
-                if (clipModels.isNotEmpty()) {
-                    val sel3d = clipModels.firstOrNull { it.id == selectedModel3dId } ?: clipModels.first()
-                    fun updateModel(mut: (Model3DItem) -> Model3DItem) {
-                        project = project.copy(models3d = project.models3d.map { if (it.id == sel3d.id) mut(it) else it })
-                        repo.saveProject(project)
-                    }
-                    Text("3D: ${sel3d.name}", style = MaterialTheme.typography.titleSmall)
-                    Text("Масштаб: ${"%.2f".format(sel3d.scale)}")
-                    Slider(value = sel3d.scale, onValueChange = { v -> updateModel { it.copy(scale = v) } }, valueRange = 0.2f..5f)
-                    Text("Поворот Y: ${sel3d.rotY.toInt()}°")
-                    Slider(value = sel3d.rotY, onValueChange = { v -> updateModel { it.copy(rotY = v) } }, valueRange = -180f..180f)
-                    Text("Поворот X: ${sel3d.rotX.toInt()}°")
-                    Slider(value = sel3d.rotX, onValueChange = { v -> updateModel { it.copy(rotX = v) } }, valueRange = -180f..180f)
-                    Text("Позиция Z: ${"%.2f".format(sel3d.posZ)}")
-                    Slider(value = sel3d.posZ, onValueChange = { v -> updateModel { it.copy(posZ = v) } }, valueRange = -8f..2f)
                 }
 
                 val selEffect = if (selectedItem?.first == "effect") project.effects.firstOrNull { it.id == selectedItem?.second } else null
                 if (selEffect != null) {
-                    fun updateEffect(mut: (EffectItem) -> EffectItem) {
-                        project = project.copy(effects = project.effects.map { if (it.id == selEffect.id) mut(it) else it })
-                        repo.saveProject(project)
-                    }
+                    fun updateEffect(mut: (EffectItem) -> EffectItem) { project = project.copy(effects = project.effects.map { if (it.id == selEffect.id) mut(it) else it }); repo.saveProject(project) }
                     HorizontalDivider()
                     Text("Эффект: ${selEffect.type}", style = MaterialTheme.typography.titleSmall)
                     Text("Интенсивность: ${"%.2f".format(selEffect.intensity)}")
@@ -347,6 +354,17 @@ fun EditorScreen(
                     Slider(value = selEffect.angleZ, onValueChange = { v -> updateEffect { it.copy(angleZ = v) } }, valueRange = -180f..180f)
                     Text("Масштаб: ${"%.2f".format(selEffect.scale)}")
                     Slider(value = selEffect.scale, onValueChange = { v -> updateEffect { it.copy(scale = v) } }, valueRange = 0.2f..3f)
+                }
+
+                if (clipModels.isNotEmpty()) {
+                    val sel3d = clipModels.firstOrNull { it.id == selectedModel3dId } ?: clipModels.first()
+                    fun updateModel(mut: (Model3DItem) -> Model3DItem) { project = project.copy(models3d = project.models3d.map { if (it.id == sel3d.id) mut(it) else it }); repo.saveProject(project) }
+                    HorizontalDivider()
+                    Text("3D: ${sel3d.name}", style = MaterialTheme.typography.titleSmall)
+                    Text("Масштаб: ${"%.2f".format(sel3d.scale)}")
+                    Slider(value = sel3d.scale, onValueChange = { v -> updateModel { it.copy(scale = v) } }, valueRange = 0.2f..5f)
+                    Text("Поворот Y: ${sel3d.rotY.toInt()}°")
+                    Slider(value = sel3d.rotY, onValueChange = { v -> updateModel { it.copy(rotY = v) } }, valueRange = -180f..180f)
                 }
             }
 
