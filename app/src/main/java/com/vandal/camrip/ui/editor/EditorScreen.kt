@@ -189,6 +189,18 @@ fun EditorScreen(
                         repo.saveProject(project); showSheet = false
                     }, enabled = selectedClip != null, modifier = Modifier.weight(1f)) { Text("Круг") }
                 }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = {
+                        val c = selectedClip ?: return@Button
+                        project = project.copy(shapes = project.shapes + ShapeItem(System.currentTimeMillis(), c.id, "triangle", 0.25f, 0.2f, 0.3f, 0.25f, 0xFF7AA2FF, 8f, playheadMs, 0L))
+                        repo.saveProject(project); showSheet = false
+                    }, enabled = selectedClip != null, modifier = Modifier.weight(1f)) { Text("Треуг.") }
+                    Button(onClick = {
+                        val c = selectedClip ?: return@Button
+                        project = project.copy(shapes = project.shapes + ShapeItem(System.currentTimeMillis(), c.id, "line", 0.2f, 0.5f, 0.5f, 0.05f, 0xFFFFA94F, 10f, playheadMs, 0L))
+                        repo.saveProject(project); showSheet = false
+                    }, enabled = selectedClip != null, modifier = Modifier.weight(1f)) { Text("Линия") }
+                }
                 Spacer(Modifier.height(20.dp))
             }
         }
@@ -496,6 +508,13 @@ fun ShapeOverlay(shapes: List<ShapeItem>, playheadMs: Long) {
             val h = s.h * size.height
             when (s.type) {
                 "circle" -> drawOval(color = color, topLeft = androidx.compose.ui.geometry.Offset(left, top), size = androidx.compose.ui.geometry.Size(w, h), style = androidx.compose.ui.graphics.drawscope.Stroke(width = s.stroke))
+                "triangle" -> {
+                    val path = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(left + w / 2f, top); lineTo(left + w, top + h); lineTo(left, top + h); close()
+                    }
+                    drawPath(path, color = color, style = androidx.compose.ui.graphics.drawscope.Stroke(width = s.stroke))
+                }
+                "line" -> drawLine(color = color, start = androidx.compose.ui.geometry.Offset(left, top + h / 2f), end = androidx.compose.ui.geometry.Offset(left + w, top + h / 2f), strokeWidth = s.stroke)
                 else -> drawRect(color = color, topLeft = androidx.compose.ui.geometry.Offset(left, top), size = androidx.compose.ui.geometry.Size(w, h), style = androidx.compose.ui.graphics.drawscope.Stroke(width = s.stroke))
             }
         }
@@ -576,7 +595,15 @@ fun exportClip(context: Context, clip: Clip, effects: List<EffectItem>, shapes: 
                         if (s.endMs > 0 && (tMs < s.startMs || tMs > s.endMs)) return@forEach
                         p.color = s.color.toInt(); p.strokeWidth = s.stroke
                         val l = s.x * 1080f; val top = s.y * 1920f; val r = (s.x + s.w) * 1080f; val b = (s.y + s.h) * 1920f
-                        if (s.type == "circle") c.drawOval(l, top, r, b, p) else c.drawRect(l, top, r, b, p)
+                        when (s.type) {
+                            "circle" -> c.drawOval(l, top, r, b, p)
+                            "triangle" -> {
+                                val path = android.graphics.Path().apply { moveTo(l + (r-l)/2f, top); lineTo(r, b); lineTo(l, b); close() }
+                                c.drawPath(path, p)
+                            }
+                            "line" -> c.drawLine(l, top + (b-top)/2f, r, top + (b-top)/2f, p)
+                            else -> c.drawRect(l, top, r, b, p)
+                        }
                     }
                     return bmp
                 }
