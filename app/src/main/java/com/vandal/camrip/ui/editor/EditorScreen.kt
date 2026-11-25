@@ -127,7 +127,13 @@ fun EditorScreen(
         while (isPlaying) {
             playheadMs = player?.currentPosition ?: 0L
             val d = player?.duration ?: 0L
-            if (d > 0) durationMs = d
+            if (d > 0) {
+                durationMs = d
+                val sc = selectedClip
+                if (sc != null && sc.durationMs != d) {
+                    project = project.copy(clips = project.clips.map { if (it.id == sc.id) it.copy(durationMs = d) else it })
+                }
+            }
             delay(100)
         }
     }
@@ -261,7 +267,7 @@ fun EditorScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("Видеодорожка (Video Track)", style = MaterialTheme.typography.labelLarge)
+                    Column { Text("Видеодорожка (Video Track)", style = MaterialTheme.typography.labelLarge); Text("Playhead ${formatMs(playheadMs)} • Snap 250ms", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary) }
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                         TextButton(onClick = { timelineZoom = (timelineZoom - 0.25f).coerceAtLeast(0.5f) }) { Text("-") }
                         Text("${"%.1f".format(timelineZoom)}x", style = MaterialTheme.typography.labelSmall)
@@ -284,19 +290,20 @@ fun EditorScreen(
                                 }
                             }
                         }
-                        Box(Modifier.width(timelineWidth).height(170.dp).background(Color(0xFF101018), RoundedCornerShape(10.dp))) {
+                        Box(Modifier.width(timelineWidth).height(210.dp).background(Color(0xFF101018), RoundedCornerShape(12.dp))) {
                             // grid
                             androidx.compose.foundation.Canvas(Modifier.matchParentSize()) {
                                 val step = 1000f * pxPerMs * density
                                 var x = 0f
                                 while (x < size.width) { drawLine(Color(0xFF2A2A3A), androidx.compose.ui.geometry.Offset(x, 0f), androidx.compose.ui.geometry.Offset(x, size.height), 1f); x += step }
                                 val ph = playheadMs * pxPerMs * density
-                                drawLine(Color(0xFFFF4FD8), androidx.compose.ui.geometry.Offset(ph, 0f), androidx.compose.ui.geometry.Offset(ph, size.height), 3f)
+                                drawLine(Color(0xFFFF4FD8), androidx.compose.ui.geometry.Offset(ph, 0f), androidx.compose.ui.geometry.Offset(ph, size.height), 4f)
+                                drawCircle(Color(0xFFFF4FD8), radius=6f, center=androidx.compose.ui.geometry.Offset(ph, 8f))
                             }
                             Column(Modifier.matchParentSize().padding(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 // video track
-                                Text("Видео", color = Color.White, style = MaterialTheme.typography.labelSmall)
-                                Row(Modifier.height(34.dp)) {
+                                Text("Видео дорожка", color = Color(0xFFB8D8FF), style = MaterialTheme.typography.labelSmall)
+                                Row(Modifier.height(40.dp), verticalAlignment = Alignment.CenterVertically) {
                                     project.clips.forEachIndexed { idx, clip ->
                                         val dur = ((if (clip.endMs > 0) clip.endMs else (clip.durationMs.takeIf { it > 0 } ?: 4000L)) - clip.startMs).coerceAtLeast(500L); val w = (dur * pxPerMs).dp
                                         val sel = selectedItem == ("clip" to clip.id) || selectedClipId == clip.id
@@ -309,8 +316,8 @@ fun EditorScreen(
                                     }
                                 }
                                 // effects track
-                                Text("Эффекты", color = Color.White, style = MaterialTheme.typography.labelSmall)
-                                Row(Modifier.height(30.dp)) {
+                                Text("Эффекты", color = Color(0xFFD8B8FF), style = MaterialTheme.typography.labelSmall)
+                                Row(Modifier.height(36.dp), verticalAlignment = Alignment.CenterVertically) {
                                     clipEffects.forEach { e ->
                                         val left = (e.startMs.coerceAtLeast(0L) * pxPerMs).dp
                                         val sel = selectedItem == ("effect" to e.id)
@@ -324,8 +331,8 @@ fun EditorScreen(
                                     }
                                 }
                                 // 3d track
-                                Text("3D", color = Color.White, style = MaterialTheme.typography.labelSmall)
-                                Row(Modifier.height(30.dp)) {
+                                Text("3D объекты", color = Color(0xFFB8FFE0), style = MaterialTheme.typography.labelSmall)
+                                Row(Modifier.height(36.dp), verticalAlignment = Alignment.CenterVertically) {
                                     clipModels.forEach { m ->
                                         val left = (m.startMs.coerceAtLeast(0L) * pxPerMs).dp
                                         val sel = selectedItem == ("model3d" to m.id)
@@ -472,17 +479,17 @@ fun Model3DOverlay(models: List<Model3DItem>) {
 @androidx.annotation.OptIn(UnstableApi::class)
 fun EffectItem.toMedia3Effects(): List<Effect> = when (type) {
     "grayscale" -> listOf(RgbFilter.createGrayscaleFilter())
-    "brightness" -> listOf(Brightness(((intensity - 0.5f) * 0.8f).coerceIn(-1f, 1f)))
-    "contrast" -> listOf(Contrast(((intensity - 0.5f) * 1.2f).coerceIn(-1f, 1f)))
-    "fade" -> listOf(Brightness((-intensity * 0.8f).coerceIn(-1f, 1f)))
-    "punch" -> listOf(Contrast((intensity * 0.8f).coerceIn(-1f, 1f)), Brightness((intensity * 0.1f).coerceIn(-1f, 1f)))
-    "glitch" -> listOf(RgbFilter.createGrayscaleFilter(), Contrast((intensity * 0.6f).coerceIn(-1f, 1f)))
-    "chromatic" -> listOf(Contrast((intensity * 0.3f).coerceIn(-1f, 1f)), Brightness((intensity * 0.05f).coerceIn(-1f, 1f)))
+    "brightness" -> listOf(Brightness(((intensity - 0.5f) * 1.2f).coerceIn(-1f, 1f)))
+    "contrast" -> listOf(Contrast(((intensity - 0.5f) * 1.6f).coerceIn(-1f, 1f)))
+    "fade" -> listOf(Brightness((-intensity * 1.0f).coerceIn(-1f, 1f)))
+    "punch" -> listOf(Contrast((intensity * 1.0f).coerceIn(-1f, 1f)), Brightness((intensity * 0.15f).coerceIn(-1f, 1f)))
+    "glitch" -> listOf(RgbFilter.createGrayscaleFilter(), Contrast((intensity * 0.9f).coerceIn(-1f, 1f)), Brightness((intensity * 0.1f).coerceIn(-1f, 1f)))
+    "chromatic" -> listOf(Contrast((intensity * 0.5f).coerceIn(-1f, 1f)), Brightness((intensity * 0.08f).coerceIn(-1f, 1f)))
     "rotate3d", "perspective", "cube", "parallax", "flip", "tilt" ->
         listOf(ScaleAndRotateTransformation.Builder().setRotationDegrees(angleZ).build())
     "zoom", "zoom3d" -> listOf(ScaleAndRotateTransformation.Builder().setScale(scale.coerceAtLeast(0.1f), scale.coerceAtLeast(0.1f)).build())
-    "shake" -> listOf(ScaleAndRotateTransformation.Builder().setRotationDegrees((intensity * 6f)).build())
-    "wave", "fisheye", "pixelate" -> listOf(Contrast((intensity * 0.2f).coerceIn(-1f, 1f))) // visual approximation
+    "shake" -> listOf(ScaleAndRotateTransformation.Builder().setRotationDegrees((intensity * 10f)).build())
+    "wave", "fisheye", "pixelate" -> listOf(Contrast((intensity * 0.35f).coerceIn(-1f, 1f)), Brightness((intensity * 0.05f).coerceIn(-1f, 1f)))
     else -> emptyList()
 }
 
@@ -555,6 +562,7 @@ fun snapMs(ms: Long, playheadMs: Long): Long {
 fun moveTimelineItem(project: Project, type: String, id: Long, deltaMs: Long, playheadMs: Long = 0L): Project {
     return when (type) {
         "clip" -> {
+            if (kotlin.math.abs(deltaMs) < 350) return project
             val list = project.clips.toMutableList()
             val idx = list.indexOfFirst { it.id == id }
             if (idx < 0) return project

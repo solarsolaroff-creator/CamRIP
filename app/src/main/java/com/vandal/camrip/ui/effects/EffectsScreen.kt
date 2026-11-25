@@ -67,9 +67,9 @@ fun EffectsScreen(
                                 id = System.currentTimeMillis(),
                                 clipId = clipId,
                                 type = effect.type,
-                                intensity = 0.5f,
-                                angleX = 0f, angleY = 0f, angleZ = if (effect.hasAngles) 15f else 0f,
-                                scale = 1.1f, speed = 1f
+                                intensity = 0.75f,
+                                angleX = 0f, angleY = 0f, angleZ = if (effect.hasAngles) 20f else 0f,
+                                scale = 1.2f, speed = 1f
                             )
                         )
                     }) {
