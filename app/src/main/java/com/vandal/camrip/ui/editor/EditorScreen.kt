@@ -124,6 +124,10 @@ fun EditorScreen(
     }
     DisposableEffect(player) { onDispose { player?.release() } }
 
+    LaunchedEffect(player, selectedClip?.volume) {
+        player?.volume = (selectedClip?.volume ?: 1f).coerceIn(0f, 2f)
+    }
+
     LaunchedEffect(player, isPlaying) {
         player?.playWhenReady = isPlaying
         while (isPlaying) {
@@ -180,24 +184,24 @@ fun EditorScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = {
                         val c = selectedClip ?: return@Button
-                        project = project.copy(shapes = project.shapes + ShapeItem(System.currentTimeMillis(), c.id, "rect", 0.2f, 0.2f, 0.35f, 0.2f, 0xFFFF4FD8, 8f, playheadMs, 0L))
+                        project = project.copy(shapes = project.shapes + ShapeItem(System.currentTimeMillis(), c.id, "rect", 0.2f, 0.2f, 0.35f, 0.2f, 0xFFFF4FD8, 8f, playheadMs, 0L, null, true))
                         repo.saveProject(project); showSheet = false
                     }, enabled = selectedClip != null, modifier = Modifier.weight(1f)) { Text("Прямоуг.") }
                     Button(onClick = {
                         val c = selectedClip ?: return@Button
-                        project = project.copy(shapes = project.shapes + ShapeItem(System.currentTimeMillis(), c.id, "circle", 0.35f, 0.3f, 0.25f, 0.25f, 0xFF7CFFB2, 8f, playheadMs, 0L))
+                        project = project.copy(shapes = project.shapes + ShapeItem(System.currentTimeMillis(), c.id, "circle", 0.35f, 0.3f, 0.25f, 0.25f, 0xFF7CFFB2, 8f, playheadMs, 0L, null, true))
                         repo.saveProject(project); showSheet = false
                     }, enabled = selectedClip != null, modifier = Modifier.weight(1f)) { Text("Круг") }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = {
                         val c = selectedClip ?: return@Button
-                        project = project.copy(shapes = project.shapes + ShapeItem(System.currentTimeMillis(), c.id, "triangle", 0.25f, 0.2f, 0.3f, 0.25f, 0xFF7AA2FF, 8f, playheadMs, 0L))
+                        project = project.copy(shapes = project.shapes + ShapeItem(System.currentTimeMillis(), c.id, "triangle", 0.25f, 0.2f, 0.3f, 0.25f, 0xFF7AA2FF, 8f, playheadMs, 0L, null, true))
                         repo.saveProject(project); showSheet = false
                     }, enabled = selectedClip != null, modifier = Modifier.weight(1f)) { Text("Треуг.") }
                     Button(onClick = {
                         val c = selectedClip ?: return@Button
-                        project = project.copy(shapes = project.shapes + ShapeItem(System.currentTimeMillis(), c.id, "line", 0.2f, 0.5f, 0.5f, 0.05f, 0xFFFFA94F, 10f, playheadMs, 0L))
+                        project = project.copy(shapes = project.shapes + ShapeItem(System.currentTimeMillis(), c.id, "line", 0.2f, 0.5f, 0.5f, 0.05f, 0xFFFFA94F, 10f, playheadMs, 0L, null, false))
                         repo.saveProject(project); showSheet = false
                     }, enabled = selectedClip != null, modifier = Modifier.weight(1f)) { Text("Линия") }
                 }
@@ -286,6 +290,10 @@ fun EditorScreen(
                     TextButton(onClick = {
                         project = project.copy(clips = project.clips.map { if (it.id == c.id) it.copy(offsetX = 0f, offsetY = 0f, scale = 1f, rotation = 0f) else it }); repo.saveProject(project)
                     }) { Text("Сброс") }
+                }
+                Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Громкость ${"%.1f".format(c.volume)}x", style = MaterialTheme.typography.labelSmall)
+                    Slider(value = c.volume, onValueChange = { v -> project = project.copy(clips = project.clips.map { if (it.id == c.id) it.copy(volume = v) else it }) }, onValueChangeFinished = { repo.saveProject(project) }, valueRange = 0f..2f, modifier = Modifier.weight(1f))
                 }
             }
 
@@ -436,6 +444,7 @@ fun EditorScreen(
                     Text("Y: ${"%.2f".format(selShape.y)}"); Slider(value = selShape.y, onValueChange = { v -> updateShape { it.copy(y = v) } }, valueRange = 0f..1f)
                     Text("Ширина: ${"%.2f".format(selShape.w)}"); Slider(value = selShape.w, onValueChange = { v -> updateShape { it.copy(w = v) } }, valueRange = 0.05f..1f)
                     Text("Высота: ${"%.2f".format(selShape.h)}"); Slider(value = selShape.h, onValueChange = { v -> updateShape { it.copy(h = v) } }, valueRange = 0.05f..1f)
+                    Row(verticalAlignment = Alignment.CenterVertically) { Text("Заливка"); Switch(checked = selShape.filled, onCheckedChange = { v -> updateShape { it.copy(filled = v) } }) }
                 }
 
                 if (clipModels.isNotEmpty()) {
@@ -506,16 +515,17 @@ fun ShapeOverlay(shapes: List<ShapeItem>, playheadMs: Long) {
             val top = s.y * size.height
             val w = s.w * size.width
             val h = s.h * size.height
+            val style = if (s.filled && s.type != "line") androidx.compose.ui.graphics.drawscope.Fill else androidx.compose.ui.graphics.drawscope.Stroke(width = s.stroke)
             when (s.type) {
-                "circle" -> drawOval(color = color, topLeft = androidx.compose.ui.geometry.Offset(left, top), size = androidx.compose.ui.geometry.Size(w, h), style = androidx.compose.ui.graphics.drawscope.Stroke(width = s.stroke))
+                "circle" -> drawOval(color = color, topLeft = androidx.compose.ui.geometry.Offset(left, top), size = androidx.compose.ui.geometry.Size(w, h), style = style)
                 "triangle" -> {
                     val path = androidx.compose.ui.graphics.Path().apply {
                         moveTo(left + w / 2f, top); lineTo(left + w, top + h); lineTo(left, top + h); close()
                     }
-                    drawPath(path, color = color, style = androidx.compose.ui.graphics.drawscope.Stroke(width = s.stroke))
+                    drawPath(path, color = color, style = style)
                 }
                 "line" -> drawLine(color = color, start = androidx.compose.ui.geometry.Offset(left, top + h / 2f), end = androidx.compose.ui.geometry.Offset(left + w, top + h / 2f), strokeWidth = s.stroke)
-                else -> drawRect(color = color, topLeft = androidx.compose.ui.geometry.Offset(left, top), size = androidx.compose.ui.geometry.Size(w, h), style = androidx.compose.ui.graphics.drawscope.Stroke(width = s.stroke))
+                else -> drawRect(color = color, topLeft = androidx.compose.ui.geometry.Offset(left, top), size = androidx.compose.ui.geometry.Size(w, h), style = style)
             }
         }
     }
@@ -594,6 +604,7 @@ fun exportClip(context: Context, clip: Clip, effects: List<EffectItem>, shapes: 
                     shapes.forEach { s ->
                         if (s.endMs > 0 && (tMs < s.startMs || tMs > s.endMs)) return@forEach
                         p.color = s.color.toInt(); p.strokeWidth = s.stroke
+                        p.style = if (s.filled && s.type != "line") android.graphics.Paint.Style.FILL else android.graphics.Paint.Style.STROKE
                         val l = s.x * 1080f; val top = s.y * 1920f; val r = (s.x + s.w) * 1080f; val b = (s.y + s.h) * 1920f
                         when (s.type) {
                             "circle" -> c.drawOval(l, top, r, b, p)
@@ -617,7 +628,10 @@ fun exportClip(context: Context, clip: Clip, effects: List<EffectItem>, shapes: 
         if (clip.endMs > 0) clipBuilder.setEndPositionMs(clip.endMs)
         mediaItemBuilder.setClippingConfiguration(clipBuilder.build())
     }
-    val edited = EditedMediaItem.Builder(mediaItemBuilder.build()).setEffects(Effects(emptyList(), videoEffects)).build()
+    val edited = EditedMediaItem.Builder(mediaItemBuilder.build())
+        .setVolume(clip.volume.coerceIn(0f, 2f))
+        .setEffects(Effects(emptyList(), videoEffects))
+        .build()
     val transformer = Transformer.Builder(context).addListener(object : Transformer.Listener {
         override fun onCompleted(composition: Composition, exportResult: ExportResult) {
             val ok = saveToGallery(context, outFile)

@@ -45,6 +45,7 @@ private fun Project.toJson(): JSONObject = JSONObject().apply {
             put("id", c.id); put("uri", c.uri); put("startMs", c.startMs); put("endMs", c.endMs); put("durationMs", c.durationMs); put("label", c.label)
             put("groupId", c.groupId ?: "")
             put("offsetX", c.offsetX.toDouble()); put("offsetY", c.offsetY.toDouble()); put("scale", c.scale.toDouble()); put("rotation", c.rotation.toDouble())
+            put("volume", c.volume.toDouble())
         })
     }})
     put("effects", JSONArray().apply { effects.forEach { e ->
@@ -66,7 +67,7 @@ private fun Project.toJson(): JSONObject = JSONObject().apply {
         put(JSONObject().apply {
             put("id", s.id); put("clipId", s.clipId); put("type", s.type)
             put("x", s.x.toDouble()); put("y", s.y.toDouble()); put("w", s.w.toDouble()); put("h", s.h.toDouble())
-            put("color", s.color); put("stroke", s.stroke.toDouble()); put("startMs", s.startMs); put("endMs", s.endMs); put("groupId", s.groupId ?: "")
+            put("color", s.color); put("stroke", s.stroke.toDouble()); put("startMs", s.startMs); put("endMs", s.endMs); put("groupId", s.groupId ?: ""); put("filled", s.filled)
         })
     }})
 }
@@ -79,7 +80,7 @@ private fun JSONObject.toProject(): Project {
     return Project(
         id = optLong("id"), name = optString("name"), createdAt = optLong("createdAt"), updatedAt = optLong("updatedAt"),
         clips = (0 until clipsArr.length()).map { i -> clipsArr.getJSONObject(i).let { c ->
-            Clip(c.optLong("id"), c.optString("uri"), c.optLong("startMs"), c.optLong("endMs"), c.optLong("durationMs"), c.optString("label", "Клип"), c.optString("groupId").ifBlank { null }, c.optDouble("offsetX", 0.0).toFloat(), c.optDouble("offsetY", 0.0).toFloat(), c.optDouble("scale", 1.0).toFloat(), c.optDouble("rotation", 0.0).toFloat())
+            Clip(c.optLong("id"), c.optString("uri"), c.optLong("startMs"), c.optLong("endMs"), c.optLong("durationMs"), c.optString("label", "Клип"), c.optString("groupId").ifBlank { null }, c.optDouble("offsetX", 0.0).toFloat(), c.optDouble("offsetY", 0.0).toFloat(), c.optDouble("scale", 1.0).toFloat(), c.optDouble("rotation", 0.0).toFloat(), c.optDouble("volume", 1.0).toFloat())
         } },
         effects = (0 until effectsArr.length()).map { i -> effectsArr.getJSONObject(i).let { e ->
             EffectItem(e.optLong("id"), e.optLong("clipId"), e.optString("type"), e.optDouble("intensity", 0.5).toFloat(), e.optDouble("angleX", 0.0).toFloat(), e.optDouble("angleY", 0.0).toFloat(), e.optDouble("angleZ", 0.0).toFloat(), e.optDouble("scale", 1.0).toFloat(), e.optDouble("speed", 1.0).toFloat(), e.optString("groupId").ifBlank { null }, e.optLong("startMs", 0L))
@@ -88,7 +89,7 @@ private fun JSONObject.toProject(): Project {
             Model3DItem(m.optLong("id"), m.optLong("clipId"), m.optString("name"), m.optString("filePath"), m.optDouble("posX", 0.0).toFloat(), m.optDouble("posY", 0.0).toFloat(), m.optDouble("posZ", -2.0).toFloat(), m.optDouble("rotX", 0.0).toFloat(), m.optDouble("rotY", 0.0).toFloat(), m.optDouble("rotZ", 0.0).toFloat(), m.optDouble("scale", 1.0).toFloat(), m.optString("groupId").ifBlank { null }, m.optLong("startMs", 0L))
         } },
         shapes = (0 until shapesArr.length()).map { i -> shapesArr.getJSONObject(i).let { s ->
-            ShapeItem(s.optLong("id"), s.optLong("clipId"), s.optString("type", "rect"), s.optDouble("x", 0.2).toFloat(), s.optDouble("y", 0.2).toFloat(), s.optDouble("w", 0.3).toFloat(), s.optDouble("h", 0.2).toFloat(), s.optLong("color", 0xFFFF4FD8), s.optDouble("stroke", 8.0).toFloat(), s.optLong("startMs", 0L), s.optLong("endMs", 0L), s.optString("groupId").ifBlank { null })
+            ShapeItem(s.optLong("id"), s.optLong("clipId"), s.optString("type", "rect"), s.optDouble("x", 0.2).toFloat(), s.optDouble("y", 0.2).toFloat(), s.optDouble("w", 0.3).toFloat(), s.optDouble("h", 0.2).toFloat(), s.optLong("color", 0xFFFF4FD8), s.optDouble("stroke", 8.0).toFloat(), s.optLong("startMs", 0L), s.optLong("endMs", 0L), s.optString("groupId").ifBlank { null }, s.optBoolean("filled", false))
         } }
     )
 }

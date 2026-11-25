@@ -22,7 +22,8 @@ data class Clip(
     val offsetX: Float = 0f,
     val offsetY: Float = 0f,
     val scale: Float = 1f,
-    val rotation: Float = 0f
+    val rotation: Float = 0f,
+    val volume: Float = 1f
 )
 
 data class EffectItem(
@@ -58,7 +59,7 @@ data class Model3DItem(
 data class ShapeItem(
     val id: Long,
     val clipId: Long,
-    val type: String, // rect, circle, line
+    val type: String, // rect, circle, line, triangle
     val x: Float = 0.2f,
     val y: Float = 0.2f,
     val w: Float = 0.3f,
@@ -67,5 +68,6 @@ data class ShapeItem(
     val stroke: Float = 8f,
     val startMs: Long = 0L,
     val endMs: Long = 0L,
-    val groupId: String? = null
+    val groupId: String? = null,
+    val filled: Boolean = false
 )
