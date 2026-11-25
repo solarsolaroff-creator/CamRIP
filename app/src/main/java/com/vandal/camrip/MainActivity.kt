@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.vandal.camrip.data.SettingsRepository
 import com.vandal.camrip.navigation.AppNavGraph
+import com.vandal.camrip.ui.theme.DesignTokens
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,24 +35,17 @@ class MainActivity : ComponentActivity() {
             val themeName by settings.theme.collectAsState(initial = "dark")
             val dynamic = accentName == "dynamic" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
             val accent = when (accentName) {
-                "green" -> Color(0xFF7CFFB2)
-                "blue" -> Color(0xFF7AA2FF)
+                "green" -> DesignTokens.Secondary
+                "blue" -> DesignTokens.Tertiary
                 "orange" -> Color(0xFFFFA94F)
-                else -> Color(0xFFFF4FD8)
+                else -> DesignTokens.Primary
             }
             val dark = if (dynamic) dynamicDarkColorScheme(context) else darkColorScheme(
-                primary = accent, secondary = Color(0xFF7CFFB2), tertiary = Color(0xFF7AA2FF),
-                background = Color(0xFF0A0A12), surface = Color(0xFF151525), surfaceVariant = Color(0xFF1E1E33), onSurface = Color(0xFFF0F0FF)
+                primary = accent, secondary = DesignTokens.Secondary, tertiary = DesignTokens.Tertiary,
+                background = DesignTokens.BackgroundDark, surface = DesignTokens.SurfaceDark, surfaceVariant = DesignTokens.SurfaceVariantDark, onSurface = DesignTokens.OnSurfaceDark
             )
             val light = if (dynamic) dynamicLightColorScheme(context) else lightColorScheme(primary = accent, secondary = Color(0xFF2D8A5F), background = Color(0xFFF7F7FC), surface = Color(0xFFFFFFFF), onSurface = Color(0xFF111122))
-            val shapes = Shapes(
-                extraSmall = RoundedCornerShape(8.dp),
-                small = RoundedCornerShape(12.dp),
-                medium = RoundedCornerShape(16.dp),
-                large = RoundedCornerShape(24.dp),
-                extraLarge = RoundedCornerShape(28.dp)
-            )
-            MaterialTheme(colorScheme = if (themeName == "light") light else dark, shapes = shapes, typography = Typography()) {
+            MaterialTheme(colorScheme = if (themeName == "light") light else dark, shapes = DesignTokens.Shapes, typography = Typography()) {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     AppNavGraph()
                 }

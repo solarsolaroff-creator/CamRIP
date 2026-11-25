@@ -1,0 +1,26 @@
+{
+  "source": "Material 3 Design Kit (Figma community) - token mapping",
+  "color": {
+    "primary": "#FF4FD8",
+    "secondary": "#7CFFB2",
+    "tertiary": "#7AA2FF",
+    "backgroundDark": "#0A0A12",
+    "surfaceDark": "#151525",
+    "surfaceVariantDark": "#1E1E33",
+    "onSurfaceDark": "#F0F0FF"
+  },
+  "shape": {
+    "extraSmall": 8,
+    "small": 12,
+    "medium": 16,
+    "large": 24,
+    "extraLarge": 28
+  },
+  "spacing": {
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24
+  }
+}
