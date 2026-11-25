@@ -56,6 +56,7 @@ import com.vandal.camrip.data.Model3DItem
 import com.vandal.camrip.data.Project
 import com.vandal.camrip.data.ProjectRepository
 import com.vandal.camrip.data.SettingsRepository
+import com.vandal.camrip.data.ShapeItem
 import io.github.sceneview.Scene
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Rotation
@@ -580,7 +581,7 @@ fun exportClip(context: Context, clip: Clip, effects: List<EffectItem>, shapes: 
                     return bmp
                 }
             }
-            videoEffects += androidx.media3.effect.OverlayEffect(listOf(overlay))
+            videoEffects += androidx.media3.effect.OverlayEffect(com.google.common.collect.ImmutableList.of<androidx.media3.effect.TextureOverlay>(overlay))
         } catch (_: Throwable) {}
     }
     val mediaItemBuilder = MediaItem.Builder().setUri(Uri.parse(clip.uri))
