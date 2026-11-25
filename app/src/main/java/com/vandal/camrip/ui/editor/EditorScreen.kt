@@ -108,7 +108,7 @@ fun EditorScreen(
 
     val previewEffects = remember(clipEffects) { clipEffects.flatMap { it.toMedia3Effects() } }
 
-    val player = remember(selectedClip?.uri, clipEffects.map { it.id to it.type to it.intensity }) {
+    val player = remember(selectedClip?.uri, clipEffects.map { it.id to it.type to it.intensity to it.angleZ to it.scale }) {
         selectedClip?.let {
             ExoPlayer.Builder(context).build().apply {
                 setMediaItem(MediaItem.fromUri(Uri.parse(it.uri)))
@@ -310,6 +310,22 @@ fun EditorScreen(
                     Slider(value = sel3d.rotX, onValueChange = { v -> updateModel { it.copy(rotX = v) } }, valueRange = -180f..180f)
                     Text("Позиция Z: ${"%.2f".format(sel3d.posZ)}")
                     Slider(value = sel3d.posZ, onValueChange = { v -> updateModel { it.copy(posZ = v) } }, valueRange = -8f..2f)
+                }
+
+                val selEffect = if (selectedItem?.first == "effect") project.effects.firstOrNull { it.id == selectedItem?.second } else null
+                if (selEffect != null) {
+                    fun updateEffect(mut: (EffectItem) -> EffectItem) {
+                        project = project.copy(effects = project.effects.map { if (it.id == selEffect.id) mut(it) else it })
+                        repo.saveProject(project)
+                    }
+                    HorizontalDivider()
+                    Text("Эффект: ${selEffect.type}", style = MaterialTheme.typography.titleSmall)
+                    Text("Интенсивность: ${"%.2f".format(selEffect.intensity)}")
+                    Slider(value = selEffect.intensity, onValueChange = { v -> updateEffect { it.copy(intensity = v) } }, valueRange = 0f..1f)
+                    Text("Угол Z: ${selEffect.angleZ.toInt()}°")
+                    Slider(value = selEffect.angleZ, onValueChange = { v -> updateEffect { it.copy(angleZ = v) } }, valueRange = -180f..180f)
+                    Text("Масштаб: ${"%.2f".format(selEffect.scale)}")
+                    Slider(value = selEffect.scale, onValueChange = { v -> updateEffect { it.copy(scale = v) } }, valueRange = 0.2f..3f)
                 }
             }
 
