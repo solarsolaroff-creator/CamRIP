@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -46,11 +47,11 @@ class MainActivity : ComponentActivity() {
             val shapes = Shapes(
                 extraSmall = RoundedCornerShape(8.dp),
                 small = RoundedCornerShape(12.dp),
-                medium = RoundedCornerShape(18.dp),
-                large = RoundedCornerShape(28.dp),
-                extraLarge = RoundedCornerShape(36.dp)
+                medium = RoundedCornerShape(16.dp),
+                large = RoundedCornerShape(24.dp),
+                extraLarge = RoundedCornerShape(28.dp)
             )
-            MaterialTheme(colorScheme = if (themeName == "light") light else dark, shapes = shapes) {
+            MaterialTheme(colorScheme = if (themeName == "light") light else dark, shapes = shapes, typography = Typography()) {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     AppNavGraph()
                 }
