@@ -17,11 +17,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme(
                 colorScheme = darkColorScheme(
-                    primary = Color(0xFF7CFFB2),
-                    secondary = Color(0xFF7AA2FF),
-                    background = Color(0xFF0B0B10),
-                    surface = Color(0xFF171722),
-                    onSurface = Color(0xFFEAEAF2)
+                    primary = Color(0xFFFF4FD8),
+                    secondary = Color(0xFF7CFFB2),
+                    tertiary = Color(0xFF7AA2FF),
+                    background = Color(0xFF0A0A12),
+                    surface = Color(0xFF151525),
+                    surfaceVariant = Color(0xFF1E1E33),
+                    onSurface = Color(0xFFF0F0FF)
                 )
             ) {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {

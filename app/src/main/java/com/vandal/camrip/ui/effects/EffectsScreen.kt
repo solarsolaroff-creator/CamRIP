@@ -36,15 +36,21 @@ fun EffectsScreen(
             EffectDef("perspective", "Перспектива", "3D-трансформации", true),
             EffectDef("cube", "3D-куб", "3D-трансформации", true),
             EffectDef("parallax", "Параллакс", "3D-трансформации", true),
+            EffectDef("flip", "Отразить 3D", "3D-трансформации", true),
+            EffectDef("zoom3d", "3D Зум", "3D-трансформации", true),
             EffectDef("wave", "Волна", "Искажения"),
             EffectDef("fisheye", "Рыбий глаз", "Искажения"),
             EffectDef("glitch", "Глитч/Warp", "Искажения"),
+            EffectDef("pixelate", "Пикселизация", "Искажения"),
             EffectDef("chromatic", "Хром. аберрация", "Свет и цвет"),
             EffectDef("brightness", "Яркость", "Свет и цвет"),
             EffectDef("contrast", "Контраст", "Свет и цвет"),
             EffectDef("grayscale", "Ч/Б", "Свет и цвет"),
+            EffectDef("fade", "Затемнение", "Свет и цвет"),
+            EffectDef("punch", "Панч", "Свет и цвет"),
             EffectDef("shake", "Тряска камеры", "Камера/шейки"),
             EffectDef("zoom", "Зум-пульс", "Камера/шейки"),
+            EffectDef("tilt", "Наклон камеры", "Камера/шейки"),
         )
     }
 
@@ -59,7 +65,7 @@ fun EffectsScreen(
             }
 
             LazyVerticalGrid(
-                columns = GridCells.Adaptive(150.dp),
+                columns = GridCells.Adaptive(145.dp),
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -85,14 +91,10 @@ fun EffectsScreen(
                 Text("Интенсивность: ${"%.2f".format(intensity)}")
                 Slider(value = intensity, onValueChange = { intensity = it }, valueRange = 0f..1f)
                 if (effect.hasAngles) {
-                    Text("Угол X: ${angleX.toInt()}°")
-                    Slider(value = angleX, onValueChange = { angleX = it }, valueRange = -180f..180f)
-                    Text("Угол Y: ${angleY.toInt()}°")
-                    Slider(value = angleY, onValueChange = { angleY = it }, valueRange = -180f..180f)
-                    Text("Угол Z: ${angleZ.toInt()}°")
-                    Slider(value = angleZ, onValueChange = { angleZ = it }, valueRange = -180f..180f)
-                    Text("Масштаб: ${"%.2f".format(scale)}")
-                    Slider(value = scale, onValueChange = { scale = it }, valueRange = 0.2f..3f)
+                    Text("Угол X: ${angleX.toInt()}°"); Slider(value = angleX, onValueChange = { angleX = it }, valueRange = -180f..180f)
+                    Text("Угол Y: ${angleY.toInt()}°"); Slider(value = angleY, onValueChange = { angleY = it }, valueRange = -180f..180f)
+                    Text("Угол Z: ${angleZ.toInt()}°"); Slider(value = angleZ, onValueChange = { angleZ = it }, valueRange = -180f..180f)
+                    Text("Масштаб: ${"%.2f".format(scale)}"); Slider(value = scale, onValueChange = { scale = it }, valueRange = 0.2f..3f)
                 }
                 Text("Скорость: ${"%.2f".format(speed)}")
                 Slider(value = speed, onValueChange = { speed = it }, valueRange = 0.1f..3f)

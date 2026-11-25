@@ -11,6 +11,8 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -82,6 +84,7 @@ fun EditorScreen(
     var durationMs by remember { mutableStateOf(0L) }
     var exporting by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("") }
+    var selectedModel3dId by remember { mutableStateOf<Long?>(null) }
 
     val selectedClip = project.clips.firstOrNull { it.id == selectedClipId } ?: project.clips.firstOrNull()
     val clipEffects = project.effects.filter { it.clipId == selectedClip?.id }
@@ -137,7 +140,8 @@ fun EditorScreen(
                 if (saved != null) {
                     val item = Model3DItem(
                         id = System.currentTimeMillis(), clipId = selectedClip.id,
-                        name = saved.name, filePath = saved.absolutePath
+                        name = saved.name, filePath = saved.absolutePath,
+                        posZ = -1.5f, scale = 1.8f
                     )
                     project = project.copy(models3d = project.models3d + item)
                     repo.saveProject(project)
@@ -198,17 +202,40 @@ fun EditorScreen(
             }
             if (status.isNotBlank()) Text(status, modifier = Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
 
-            Column(Modifier.fillMaxWidth().height(210.dp).background(MaterialTheme.colorScheme.surfaceVariant).padding(10.dp)) {
+            Column(
+                Modifier.fillMaxWidth().heightIn(min = 210.dp, max = 360.dp).background(MaterialTheme.colorScheme.surfaceVariant).verticalScroll(rememberScrollState()).padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Text("Таймлайн", style = MaterialTheme.typography.labelLarge)
-                Spacer(Modifier.height(8.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(project.clips, key = { it.id }) { clip ->
                         FilterChip(selected = clip.id == selectedClipId, onClick = { selectedClipId = clip.id }, label = { Text(clip.label) })
                     }
                 }
-                Spacer(Modifier.height(8.dp))
                 Slider(value = playheadMs.toFloat(), onValueChange = { playheadMs = it.toLong(); player?.seekTo(playheadMs) }, valueRange = 0f..(durationMs.coerceAtLeast(1L).toFloat()))
                 Text("Эффекты: ${clipEffects.size} • 3D: ${clipModels.size}", style = MaterialTheme.typography.bodySmall)
+
+                if (clipModels.isNotEmpty()) {
+                    Text("3D-модели", style = MaterialTheme.typography.titleSmall)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(clipModels, key = { it.id }) { m ->
+                            FilterChip(selected = selectedModel3dId == m.id, onClick = { selectedModel3dId = m.id }, label = { Text(m.name.take(12)) })
+                        }
+                    }
+                    val sel3d = clipModels.firstOrNull { it.id == selectedModel3dId } ?: clipModels.first()
+                    fun updateModel(mut: (Model3DItem) -> Model3DItem) {
+                        project = project.copy(models3d = project.models3d.map { if (it.id == sel3d.id) mut(it) else it })
+                        repo.saveProject(project)
+                    }
+                    Text("Масштаб: ${"%.2f".format(sel3d.scale)}")
+                    Slider(value = sel3d.scale, onValueChange = { v -> updateModel { it.copy(scale = v) } }, valueRange = 0.2f..5f)
+                    Text("Поворот Y: ${sel3d.rotY.toInt()}°")
+                    Slider(value = sel3d.rotY, onValueChange = { v -> updateModel { it.copy(rotY = v) } }, valueRange = -180f..180f)
+                    Text("Поворот X: ${sel3d.rotX.toInt()}°")
+                    Slider(value = sel3d.rotX, onValueChange = { v -> updateModel { it.copy(rotX = v) } }, valueRange = -180f..180f)
+                    Text("Позиция Z: ${"%.2f".format(sel3d.posZ)}")
+                    Slider(value = sel3d.posZ, onValueChange = { v -> updateModel { it.copy(posZ = v) } }, valueRange = -8f..2f)
+                }
             }
         }
     }
@@ -252,13 +279,17 @@ fun Model3DOverlay(models: List<Model3DItem>) {
 @androidx.annotation.OptIn(UnstableApi::class)
 fun EffectItem.toMedia3Effects(): List<Effect> = when (type) {
     "grayscale" -> listOf(RgbFilter.createGrayscaleFilter())
-    "brightness" -> listOf(Brightness(intensity.coerceIn(-1f, 1f)))
-    "contrast" -> listOf(Contrast(intensity.coerceIn(-1f, 1f)))
-    "glitch" -> listOf(RgbFilter.createGrayscaleFilter(), Contrast((intensity * 0.8f).coerceIn(-1f, 1f)))
-    "chromatic" -> listOf(Contrast((intensity * 0.4f).coerceIn(-1f, 1f)))
-    "rotate3d", "perspective", "cube", "parallax" -> listOf(ScaleAndRotateTransformation.Builder().setRotationDegrees(angleZ).build())
-    "zoom" -> listOf(ScaleAndRotateTransformation.Builder().setScale(scale.coerceAtLeast(0.1f), scale.coerceAtLeast(0.1f)).build())
-    "shake", "wave", "fisheye" -> emptyList() // preview-only placeholders; export-safe no-op
+    "brightness" -> listOf(Brightness(((intensity - 0.5f) * 0.8f).coerceIn(-1f, 1f)))
+    "contrast" -> listOf(Contrast(((intensity - 0.5f) * 1.2f).coerceIn(-1f, 1f)))
+    "fade" -> listOf(Brightness((-intensity * 0.8f).coerceIn(-1f, 1f)))
+    "punch" -> listOf(Contrast((intensity * 0.8f).coerceIn(-1f, 1f)), Brightness((intensity * 0.1f).coerceIn(-1f, 1f)))
+    "glitch" -> listOf(RgbFilter.createGrayscaleFilter(), Contrast((intensity * 0.6f).coerceIn(-1f, 1f)))
+    "chromatic" -> listOf(Contrast((intensity * 0.3f).coerceIn(-1f, 1f)), Brightness((intensity * 0.05f).coerceIn(-1f, 1f)))
+    "rotate3d", "perspective", "cube", "parallax", "flip", "tilt" ->
+        listOf(ScaleAndRotateTransformation.Builder().setRotationDegrees(angleZ).build())
+    "zoom", "zoom3d" -> listOf(ScaleAndRotateTransformation.Builder().setScale(scale.coerceAtLeast(0.1f), scale.coerceAtLeast(0.1f)).build())
+    "shake" -> listOf(ScaleAndRotateTransformation.Builder().setRotationDegrees((intensity * 6f)).build())
+    "wave", "fisheye", "pixelate" -> listOf(Contrast((intensity * 0.2f).coerceIn(-1f, 1f))) // visual approximation
     else -> emptyList()
 }
 
