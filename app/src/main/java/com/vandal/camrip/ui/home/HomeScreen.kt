@@ -34,8 +34,8 @@ fun HomeScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Column { Text("CamRIP", fontWeight = FontWeight.Bold); Text("Локальный видеоредактор", style = MaterialTheme.typography.labelSmall) } },
+            CenterAlignedTopAppBar(
+                title = { Column(horizontalAlignment = Alignment.CenterHorizontally) { Text("CamRIP", fontWeight = FontWeight.Bold); Text("Material 3 видеоредактор", style = MaterialTheme.typography.labelSmall) } },
                 actions = { IconButton(onClick = onOpenSettings) { Icon(Icons.Default.Settings, contentDescription = "Настройки") } }
             )
         },

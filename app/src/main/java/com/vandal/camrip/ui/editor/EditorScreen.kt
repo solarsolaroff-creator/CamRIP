@@ -182,7 +182,7 @@ fun EditorScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            CenterAlignedTopAppBar(
                 title = { Text(project.name, maxLines = 1) },
                 navigationIcon = { IconButton(onClick = { repo.saveProject(project); onBack() }) { Icon(Icons.Default.ArrowBack, contentDescription = "Назад") } },
                 actions = {

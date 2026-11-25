@@ -20,9 +20,9 @@ fun SettingsScreen(settings: SettingsRepository, onBack: () -> Unit) {
     val theme by settings.theme.collectAsState(initial = "dark")
     val accent by settings.accent.collectAsState(initial = "pink")
     var msg by remember { mutableStateOf("") }
-    val accents = listOf("pink" to Color(0xFFFF4FD8), "green" to Color(0xFF7CFFB2), "blue" to Color(0xFF7AA2FF), "orange" to Color(0xFFFFA94F))
+    val accents = listOf("dynamic" to Color(0xFF6750A4), "pink" to Color(0xFFFF4FD8), "green" to Color(0xFF7CFFB2), "blue" to Color(0xFF7AA2FF), "orange" to Color(0xFFFFA94F))
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Настройки") }, navigationIcon = { TextButton(onClick = onBack) { Text("Назад") } }) }) { pad ->
+    Scaffold(topBar = { CenterAlignedTopAppBar(title = { Text("Настройки") }, navigationIcon = { TextButton(onClick = onBack) { Text("Назад") } }) }) { pad ->
         Column(Modifier.padding(pad).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text("Локальные параметры", style = MaterialTheme.typography.titleMedium)
             Text("Качество экспорта по умолчанию")
@@ -37,12 +37,12 @@ fun SettingsScreen(settings: SettingsRepository, onBack: () -> Unit) {
                     FilterChip(selected = theme == t, onClick = { scope.launch { settings.setTheme(t) } }, label = { Text(t) })
                 }
             }
-            Text("Цвет акцента")
+            Text("Цвет акцента / Material You")
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 accents.forEach { (name, color) ->
-                    Column {
+                    Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
                         Box(Modifier.size(36.dp).background(color, CircleShape).clickable { scope.launch { settings.setAccent(name) } })
-                        if (accent == name) Text("•", color = color)
+                        Text(if (name == "dynamic") "Dyn" else name.take(1).uppercase(), style = MaterialTheme.typography.labelSmall, color = if (accent == name) color else MaterialTheme.colorScheme.onSurface)
                     }
                 }
             }

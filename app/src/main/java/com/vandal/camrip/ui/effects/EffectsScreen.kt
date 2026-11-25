@@ -44,7 +44,7 @@ fun EffectsScreen(
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Эффекты") }, navigationIcon = { TextButton(onClick = onBack) { Text("Назад") } }) }
+        topBar = { CenterAlignedTopAppBar(title = { Text("Эффекты") }, navigationIcon = { TextButton(onClick = onBack) { Text("Назад") } }) }
     ) { pad ->
         Column(Modifier.padding(pad).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Нажмите на эффект — он добавится на дорожку. Настроить можно в редакторе.", style = MaterialTheme.typography.bodySmall)
