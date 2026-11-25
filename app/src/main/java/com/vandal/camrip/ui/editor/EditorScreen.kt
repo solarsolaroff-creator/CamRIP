@@ -9,7 +9,9 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -64,7 +66,7 @@ import java.io.File
 import java.io.FileOutputStream
 
 @androidx.annotation.OptIn(UnstableApi::class)
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun EditorScreen(
     projectId: Long,
@@ -85,6 +87,9 @@ fun EditorScreen(
     var exporting by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("") }
     var selectedModel3dId by remember { mutableStateOf<Long?>(null) }
+    var selectedItem by remember { mutableStateOf<Pair<String, Long>?>(null) } // type,id
+    var groupPick by remember { mutableStateOf<Pair<String, Long>?>(null) }
+    var contextMenuItem by remember { mutableStateOf<Pair<String, Long>?>(null) }
 
     val selectedClip = project.clips.firstOrNull { it.id == selectedClipId } ?: project.clips.firstOrNull()
     val clipEffects = project.effects.filter { it.clipId == selectedClip?.id }
@@ -203,30 +208,53 @@ fun EditorScreen(
             if (status.isNotBlank()) Text(status, modifier = Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
 
             Column(
-                Modifier.fillMaxWidth().heightIn(min = 210.dp, max = 360.dp).background(MaterialTheme.colorScheme.surfaceVariant).verticalScroll(rememberScrollState()).padding(10.dp),
+                Modifier.fillMaxWidth().heightIn(min = 230.dp, max = 390.dp).background(MaterialTheme.colorScheme.surfaceVariant).verticalScroll(rememberScrollState()).padding(10.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Таймлайн", style = MaterialTheme.typography.labelLarge)
+                Text("Таймлайн / дорожки", style = MaterialTheme.typography.labelLarge)
+                Slider(value = playheadMs.toFloat(), onValueChange = { playheadMs = it.toLong(); player?.seekTo(playheadMs) }, valueRange = 0f..(durationMs.coerceAtLeast(1L).toFloat()))
+
+                Text("Видео", style = MaterialTheme.typography.titleSmall)
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(project.clips, key = { it.id }) { clip ->
-                        FilterChip(selected = clip.id == selectedClipId, onClick = { selectedClipId = clip.id }, label = { Text(clip.label) })
-                    }
-                }
-                Slider(value = playheadMs.toFloat(), onValueChange = { playheadMs = it.toLong(); player?.seekTo(playheadMs) }, valueRange = 0f..(durationMs.coerceAtLeast(1L).toFloat()))
-                Text("Эффекты: ${clipEffects.size} • 3D: ${clipModels.size}", style = MaterialTheme.typography.bodySmall)
-
-                if (clipModels.isNotEmpty()) {
-                    Text("3D-модели", style = MaterialTheme.typography.titleSmall)
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(clipModels, key = { it.id }) { m ->
-                            FilterChip(selected = selectedModel3dId == m.id, onClick = { selectedModel3dId = m.id }, label = { Text(m.name.take(12)) })
+                        val sel = selectedItem == ("clip" to clip.id)
+                        Box(Modifier.combinedClickable(onClick = { selectedClipId = clip.id; selectedItem = "clip" to clip.id }, onLongClick = { contextMenuItem = "clip" to clip.id })) {
+                            FilterChip(selected = sel || clip.id == selectedClipId, onClick = { selectedClipId = clip.id; selectedItem = "clip" to clip.id }, label = { Text(clip.label + (clip.groupId?.let { " [G]" } ?: "")) })
                         }
                     }
+                }
+
+                Text("Эффекты на дорожке", style = MaterialTheme.typography.titleSmall)
+                if (clipEffects.isEmpty()) Text("Нет эффектов — добавьте через +", style = MaterialTheme.typography.bodySmall)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(clipEffects, key = { it.id }) { e ->
+                        val sel = selectedItem == ("effect" to e.id)
+                        Box(Modifier.combinedClickable(onClick = { selectedItem = "effect" to e.id }, onLongClick = { contextMenuItem = "effect" to e.id })) {
+                            FilterChip(selected = sel, onClick = { selectedItem = "effect" to e.id }, label = { Text(e.type + (e.groupId?.let { " [G]" } ?: "")) })
+                        }
+                    }
+                }
+
+                Text("3D / объекты", style = MaterialTheme.typography.titleSmall)
+                if (clipModels.isEmpty()) Text("Нет 3D-объектов — импорт через +", style = MaterialTheme.typography.bodySmall)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(clipModels, key = { it.id }) { m ->
+                        val sel = selectedItem == ("model3d" to m.id)
+                        Box(Modifier.combinedClickable(onClick = { selectedItem = "model3d" to m.id; selectedModel3dId = m.id }, onLongClick = { contextMenuItem = "model3d" to m.id })) {
+                            FilterChip(selected = sel, onClick = { selectedItem = "model3d" to m.id; selectedModel3dId = m.id }, label = { Text(m.name.take(10) + (m.groupId?.let { " [G]" } ?: "")) })
+                        }
+                    }
+                }
+
+                if (groupPick != null) Text("Выбран для группы: ${groupPick!!.first}#${groupPick!!.second}", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
+
+                if (clipModels.isNotEmpty()) {
                     val sel3d = clipModels.firstOrNull { it.id == selectedModel3dId } ?: clipModels.first()
                     fun updateModel(mut: (Model3DItem) -> Model3DItem) {
                         project = project.copy(models3d = project.models3d.map { if (it.id == sel3d.id) mut(it) else it })
                         repo.saveProject(project)
                     }
+                    Text("3D: ${sel3d.name}", style = MaterialTheme.typography.titleSmall)
                     Text("Масштаб: ${"%.2f".format(sel3d.scale)}")
                     Slider(value = sel3d.scale, onValueChange = { v -> updateModel { it.copy(scale = v) } }, valueRange = 0.2f..5f)
                     Text("Поворот Y: ${sel3d.rotY.toInt()}°")
@@ -236,6 +264,44 @@ fun EditorScreen(
                     Text("Позиция Z: ${"%.2f".format(sel3d.posZ)}")
                     Slider(value = sel3d.posZ, onValueChange = { v -> updateModel { it.copy(posZ = v) } }, valueRange = -8f..2f)
                 }
+            }
+
+            contextMenuItem?.let { (type, id) ->
+                AlertDialog(
+                    onDismissRequest = { contextMenuItem = null },
+                    title = { Text("Объект: $type") },
+                    text = { Text("Зажатие: можно удалить, выбрать для группы или сгруппировать с выбранным.") },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            if (groupPick != null && groupPick != (type to id)) {
+                                val gid = "g_${System.currentTimeMillis()}"
+                                project = project.copy(
+                                    clips = project.clips.map { if ((type == "clip" && it.id == id) || (groupPick!!.first == "clip" && it.id == groupPick!!.second)) it.copy(groupId = gid) else it },
+                                    effects = project.effects.map { if ((type == "effect" && it.id == id) || (groupPick!!.first == "effect" && it.id == groupPick!!.second)) it.copy(groupId = gid) else it },
+                                    models3d = project.models3d.map { if ((type == "model3d" && it.id == id) || (groupPick!!.first == "model3d" && it.id == groupPick!!.second)) it.copy(groupId = gid) else it }
+                                )
+                                repo.saveProject(project); groupPick = null; status = "Объекты сгруппированы"
+                            } else {
+                                groupPick = type to id; status = "Выбрано для группы"
+                            }
+                            contextMenuItem = null
+                        }) { Text(if (groupPick != null && groupPick != (type to id)) "Сгруппировать" else "Выбрать для группы") }
+                    },
+                    dismissButton = {
+                        Row {
+                            TextButton(onClick = {
+                                project = when (type) {
+                                    "clip" -> project.copy(clips = project.clips.filterNot { it.id == id }, effects = project.effects.filterNot { it.clipId == id }, models3d = project.models3d.filterNot { it.clipId == id })
+                                    "effect" -> project.copy(effects = project.effects.filterNot { it.id == id })
+                                    "model3d" -> project.copy(models3d = project.models3d.filterNot { it.id == id })
+                                    else -> project
+                                }
+                                repo.saveProject(project); contextMenuItem = null; status = "Удалено"
+                            }) { Text("Удалить") }
+                            TextButton(onClick = { contextMenuItem = null }) { Text("Закрыть") }
+                        }
+                    }
+                )
             }
         }
     }

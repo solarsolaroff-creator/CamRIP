@@ -16,7 +16,8 @@ data class Clip(
     val startMs: Long = 0L,
     val endMs: Long = 0L,
     val durationMs: Long = 0L,
-    val label: String = "Клип"
+    val label: String = "Клип",
+    val groupId: String? = null
 )
 
 data class EffectItem(
@@ -28,7 +29,8 @@ data class EffectItem(
     val angleY: Float = 0f,
     val angleZ: Float = 0f,
     val scale: Float = 1f,
-    val speed: Float = 1f
+    val speed: Float = 1f,
+    val groupId: String? = null
 )
 
 data class Model3DItem(
@@ -42,5 +44,6 @@ data class Model3DItem(
     val rotX: Float = 0f,
     val rotY: Float = 0f,
     val rotZ: Float = 0f,
-    val scale: Float = 1f
+    val scale: Float = 1f,
+    val groupId: String? = null
 )
