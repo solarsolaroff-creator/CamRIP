@@ -100,6 +100,7 @@ fun EditorScreen(
     val selectedClip = project.clips.firstOrNull { it.id == selectedClipId } ?: project.clips.firstOrNull()
     val clipEffects = project.effects.filter { it.clipId == selectedClip?.id }
     val clipModels = project.models3d.filter { it.clipId == selectedClip?.id }
+    val clipShapes = project.shapes.filter { it.clipId == selectedClip?.id }
 
     LaunchedEffect(appliedEffect?.id) {
         val e = appliedEffect ?: return@LaunchedEffect
@@ -175,6 +176,18 @@ fun EditorScreen(
                 Button(onClick = { pickVideo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)); showSheet = false }, modifier = Modifier.fillMaxWidth()) { Text("Добавить видео") }
                 Button(onClick = { selectedClip?.let { onOpenEffects(it.id) }; showSheet = false }, enabled = selectedClip != null, modifier = Modifier.fillMaxWidth()) { Text("Эффекты") }
                 Button(onClick = { pickModel.launch("*/*"); showSheet = false }, enabled = selectedClip != null, modifier = Modifier.fillMaxWidth()) { Text("Импорт 3D-модели (.glb/.gltf)") }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = {
+                        val c = selectedClip ?: return@Button
+                        project = project.copy(shapes = project.shapes + ShapeItem(System.currentTimeMillis(), c.id, "rect", 0.2f, 0.2f, 0.35f, 0.2f, 0xFFFF4FD8, 8f, playheadMs, 0L))
+                        repo.saveProject(project); showSheet = false
+                    }, enabled = selectedClip != null, modifier = Modifier.weight(1f)) { Text("Прямоуг.") }
+                    Button(onClick = {
+                        val c = selectedClip ?: return@Button
+                        project = project.copy(shapes = project.shapes + ShapeItem(System.currentTimeMillis(), c.id, "circle", 0.35f, 0.3f, 0.25f, 0.25f, 0xFF7CFFB2, 8f, playheadMs, 0L))
+                        repo.saveProject(project); showSheet = false
+                    }, enabled = selectedClip != null, modifier = Modifier.weight(1f)) { Text("Круг") }
+                }
                 Spacer(Modifier.height(20.dp))
             }
         }
@@ -189,7 +202,7 @@ fun EditorScreen(
                     Button(onClick = {
                         val clip = selectedClip ?: run { status = "Нет клипа для экспорта"; return@Button }
                         exporting = true; status = "Экспорт..."
-                        exportClip(context, clip, clipEffects) { ok, msg ->
+                        exportClip(context, clip, clipEffects, clipShapes) { ok, msg ->
                             exporting = false; status = msg
                             Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                         }
@@ -235,6 +248,7 @@ fun EditorScreen(
                         )
                     }
                     Model3DOverlay(models = clipModels)
+                    ShapeOverlay(shapes = clipShapes, playheadMs = playheadMs)
                 } else {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Добавьте видео через +", color = Color.White) }
                 }
@@ -290,7 +304,7 @@ fun EditorScreen(
                                 }
                             }
                         }
-                        Box(Modifier.width(timelineWidth).height(210.dp).background(Color(0xFF101018), RoundedCornerShape(12.dp))) {
+                        Box(Modifier.width(timelineWidth).height(250.dp).background(Color(0xFF101018), RoundedCornerShape(12.dp))) {
                             // grid
                             androidx.compose.foundation.Canvas(Modifier.matchParentSize()) {
                                 val step = 1000f * pxPerMs * density
@@ -345,6 +359,21 @@ fun EditorScreen(
                                         ) { Text(m.name.take(8), maxLines = 1, style = MaterialTheme.typography.labelSmall, color = Color.White) }
                                     }
                                 }
+                                // shapes track
+                                Text("Фигуры", color = Color(0xFFFFC8E8), style = MaterialTheme.typography.labelSmall)
+                                Row(Modifier.height(36.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    clipShapes.forEach { s ->
+                                        val left = (s.startMs.coerceAtLeast(0L) * pxPerMs).dp
+                                        val sel = selectedItem == ("shape" to s.id)
+                                        if (left.value > 0f) Spacer(Modifier.width(left))
+                                        Box(
+                                            Modifier.width(88.dp).fillMaxHeight().background(if (sel) MaterialTheme.colorScheme.primary else Color(0xFFB04F8A), RoundedCornerShape(8.dp))
+                                                .combinedClickable(onClick = { selectedItem = "shape" to s.id }, onLongClick = { contextMenuItem = "shape" to s.id })
+                                                .pointerInput(s.id) { detectDragGestures { c, drag -> c.consume(); project = moveTimelineItem(project, "shape", s.id, (drag.x / (pxPerMs * dens)).toLong(), playheadMs); repo.saveProject(project) } },
+                                            contentAlignment = Alignment.Center
+                                        ) { Text(s.type, maxLines = 1, style = MaterialTheme.typography.labelSmall, color = Color.White) }
+                                    }
+                                }
                             }
                         }
                     }
@@ -385,6 +414,17 @@ fun EditorScreen(
                     Slider(value = selEffect.scale, onValueChange = { v -> updateEffect { it.copy(scale = v) } }, valueRange = 0.2f..3f)
                 }
 
+                val selShape = if (selectedItem?.first == "shape") project.shapes.firstOrNull { it.id == selectedItem?.second } else null
+                if (selShape != null) {
+                    fun updateShape(mut: (ShapeItem) -> ShapeItem) { project = project.copy(shapes = project.shapes.map { if (it.id == selShape.id) mut(it) else it }); repo.saveProject(project) }
+                    HorizontalDivider()
+                    Text("Фигура: ${selShape.type}", style = MaterialTheme.typography.titleSmall)
+                    Text("X: ${"%.2f".format(selShape.x)}"); Slider(value = selShape.x, onValueChange = { v -> updateShape { it.copy(x = v) } }, valueRange = 0f..1f)
+                    Text("Y: ${"%.2f".format(selShape.y)}"); Slider(value = selShape.y, onValueChange = { v -> updateShape { it.copy(y = v) } }, valueRange = 0f..1f)
+                    Text("Ширина: ${"%.2f".format(selShape.w)}"); Slider(value = selShape.w, onValueChange = { v -> updateShape { it.copy(w = v) } }, valueRange = 0.05f..1f)
+                    Text("Высота: ${"%.2f".format(selShape.h)}"); Slider(value = selShape.h, onValueChange = { v -> updateShape { it.copy(h = v) } }, valueRange = 0.05f..1f)
+                }
+
                 if (clipModels.isNotEmpty()) {
                     val sel3d = clipModels.firstOrNull { it.id == selectedModel3dId } ?: clipModels.first()
                     fun updateModel(mut: (Model3DItem) -> Model3DItem) { project = project.copy(models3d = project.models3d.map { if (it.id == sel3d.id) mut(it) else it }); repo.saveProject(project) }
@@ -409,7 +449,8 @@ fun EditorScreen(
                                 project = project.copy(
                                     clips = project.clips.map { if ((type == "clip" && it.id == id) || (groupPick!!.first == "clip" && it.id == groupPick!!.second)) it.copy(groupId = gid) else it },
                                     effects = project.effects.map { if ((type == "effect" && it.id == id) || (groupPick!!.first == "effect" && it.id == groupPick!!.second)) it.copy(groupId = gid) else it },
-                                    models3d = project.models3d.map { if ((type == "model3d" && it.id == id) || (groupPick!!.first == "model3d" && it.id == groupPick!!.second)) it.copy(groupId = gid) else it }
+                                    models3d = project.models3d.map { if ((type == "model3d" && it.id == id) || (groupPick!!.first == "model3d" && it.id == groupPick!!.second)) it.copy(groupId = gid) else it },
+                                    shapes = project.shapes.map { if ((type == "shape" && it.id == id) || (groupPick!!.first == "shape" && it.id == groupPick!!.second)) it.copy(groupId = gid) else it }
                                 )
                                 repo.saveProject(project); groupPick = null; status = "Объекты сгруппированы"
                             } else {
@@ -422,9 +463,10 @@ fun EditorScreen(
                         Row {
                             TextButton(onClick = {
                                 val newProject = when (type) {
-                                    "clip" -> project.copy(clips = project.clips.filterNot { it.id == id }, effects = project.effects.filterNot { it.clipId == id }, models3d = project.models3d.filterNot { it.clipId == id })
+                                    "clip" -> project.copy(clips = project.clips.filterNot { it.id == id }, effects = project.effects.filterNot { it.clipId == id }, models3d = project.models3d.filterNot { it.clipId == id }, shapes = project.shapes.filterNot { it.clipId == id })
                                     "effect" -> project.copy(effects = project.effects.filterNot { it.id == id })
                                     "model3d" -> project.copy(models3d = project.models3d.filterNot { it.id == id })
+                                    "shape" -> project.copy(shapes = project.shapes.filterNot { it.id == id })
                                     else -> project
                                 }
                                 project = newProject
@@ -436,6 +478,24 @@ fun EditorScreen(
                         }
                     }
                 )
+            }
+        }
+    }
+}
+
+@Composable
+fun ShapeOverlay(shapes: List<ShapeItem>, playheadMs: Long) {
+    androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+        shapes.forEach { s ->
+            if (s.endMs > 0 && (playheadMs < s.startMs || playheadMs > s.endMs)) return@forEach
+            val color = Color(s.color.toInt())
+            val left = s.x * size.width
+            val top = s.y * size.height
+            val w = s.w * size.width
+            val h = s.h * size.height
+            when (s.type) {
+                "circle" -> drawOval(color = color, topLeft = androidx.compose.ui.geometry.Offset(left, top), size = androidx.compose.ui.geometry.Size(w, h), style = androidx.compose.ui.graphics.drawscope.Stroke(width = s.stroke))
+                else -> drawRect(color = color, topLeft = androidx.compose.ui.geometry.Offset(left, top), size = androidx.compose.ui.geometry.Size(w, h), style = androidx.compose.ui.graphics.drawscope.Stroke(width = s.stroke))
             }
         }
     }
@@ -494,13 +554,35 @@ fun EffectItem.toMedia3Effects(): List<Effect> = when (type) {
 }
 
 @androidx.annotation.OptIn(UnstableApi::class)
-fun exportClip(context: Context, clip: Clip, effects: List<EffectItem>, onDone: (Boolean, String) -> Unit) {
+fun exportClip(context: Context, clip: Clip, effects: List<EffectItem>, shapes: List<ShapeItem>, onDone: (Boolean, String) -> Unit) {
     val outFile = File(context.cacheDir, "export_${System.currentTimeMillis()}.mp4")
     val baseEffects = mutableListOf<Effect>()
     if (clip.scale != 1f || clip.rotation != 0f) {
         baseEffects += ScaleAndRotateTransformation.Builder().setScale(clip.scale.coerceAtLeast(0.1f), clip.scale.coerceAtLeast(0.1f)).setRotationDegrees(clip.rotation).build()
     }
-    val videoEffects = baseEffects + effects.flatMap { it.toMedia3Effects() }
+    val videoEffects = mutableListOf<Effect>()
+    videoEffects += baseEffects
+    videoEffects += effects.flatMap { it.toMedia3Effects() }
+    if (shapes.isNotEmpty()) {
+        try {
+            val overlay = object : androidx.media3.effect.BitmapOverlay() {
+                override fun getBitmap(presentationTimeUs: Long): android.graphics.Bitmap {
+                    val bmp = android.graphics.Bitmap.createBitmap(1080, 1920, android.graphics.Bitmap.Config.ARGB_8888)
+                    val c = android.graphics.Canvas(bmp)
+                    val p = android.graphics.Paint().apply { style = android.graphics.Paint.Style.STROKE; isAntiAlias = true }
+                    val tMs = presentationTimeUs / 1000L
+                    shapes.forEach { s ->
+                        if (s.endMs > 0 && (tMs < s.startMs || tMs > s.endMs)) return@forEach
+                        p.color = s.color.toInt(); p.strokeWidth = s.stroke
+                        val l = s.x * 1080f; val top = s.y * 1920f; val r = (s.x + s.w) * 1080f; val b = (s.y + s.h) * 1920f
+                        if (s.type == "circle") c.drawOval(l, top, r, b, p) else c.drawRect(l, top, r, b, p)
+                    }
+                    return bmp
+                }
+            }
+            videoEffects += androidx.media3.effect.OverlayEffect(listOf(overlay))
+        } catch (_: Throwable) {}
+    }
     val mediaItemBuilder = MediaItem.Builder().setUri(Uri.parse(clip.uri))
     if (clip.startMs > 0 || clip.endMs > 0) {
         val clipBuilder = MediaItem.ClippingConfiguration.Builder().setStartPositionMs(clip.startMs.coerceAtLeast(0L))
@@ -574,6 +656,7 @@ fun moveTimelineItem(project: Project, type: String, id: Long, deltaMs: Long, pl
         }
         "effect" -> project.copy(effects = project.effects.map { if (it.id == id) it.copy(startMs = snapMs(it.startMs + deltaMs, playheadMs)) else it })
         "model3d" -> project.copy(models3d = project.models3d.map { if (it.id == id) it.copy(startMs = snapMs(it.startMs + deltaMs, playheadMs)) else it })
+        "shape" -> project.copy(shapes = project.shapes.map { if (it.id == id) it.copy(startMs = snapMs(it.startMs + deltaMs, playheadMs)) else it })
         else -> project
     }
 }

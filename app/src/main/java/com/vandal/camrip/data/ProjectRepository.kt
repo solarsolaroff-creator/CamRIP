@@ -62,12 +62,20 @@ private fun Project.toJson(): JSONObject = JSONObject().apply {
             put("groupId", m.groupId ?: ""); put("startMs", m.startMs)
         })
     }})
+    put("shapes", JSONArray().apply { shapes.forEach { s ->
+        put(JSONObject().apply {
+            put("id", s.id); put("clipId", s.clipId); put("type", s.type)
+            put("x", s.x.toDouble()); put("y", s.y.toDouble()); put("w", s.w.toDouble()); put("h", s.h.toDouble())
+            put("color", s.color); put("stroke", s.stroke.toDouble()); put("startMs", s.startMs); put("endMs", s.endMs); put("groupId", s.groupId ?: "")
+        })
+    }})
 }
 
 private fun JSONObject.toProject(): Project {
     val clipsArr = optJSONArray("clips") ?: JSONArray()
     val effectsArr = optJSONArray("effects") ?: JSONArray()
     val modelsArr = optJSONArray("models3d") ?: JSONArray()
+    val shapesArr = optJSONArray("shapes") ?: JSONArray()
     return Project(
         id = optLong("id"), name = optString("name"), createdAt = optLong("createdAt"), updatedAt = optLong("updatedAt"),
         clips = (0 until clipsArr.length()).map { i -> clipsArr.getJSONObject(i).let { c ->
@@ -78,6 +86,9 @@ private fun JSONObject.toProject(): Project {
         } },
         models3d = (0 until modelsArr.length()).map { i -> modelsArr.getJSONObject(i).let { m ->
             Model3DItem(m.optLong("id"), m.optLong("clipId"), m.optString("name"), m.optString("filePath"), m.optDouble("posX", 0.0).toFloat(), m.optDouble("posY", 0.0).toFloat(), m.optDouble("posZ", -2.0).toFloat(), m.optDouble("rotX", 0.0).toFloat(), m.optDouble("rotY", 0.0).toFloat(), m.optDouble("rotZ", 0.0).toFloat(), m.optDouble("scale", 1.0).toFloat(), m.optString("groupId").ifBlank { null }, m.optLong("startMs", 0L))
+        } },
+        shapes = (0 until shapesArr.length()).map { i -> shapesArr.getJSONObject(i).let { s ->
+            ShapeItem(s.optLong("id"), s.optLong("clipId"), s.optString("type", "rect"), s.optDouble("x", 0.2).toFloat(), s.optDouble("y", 0.2).toFloat(), s.optDouble("w", 0.3).toFloat(), s.optDouble("h", 0.2).toFloat(), s.optLong("color", 0xFFFF4FD8), s.optDouble("stroke", 8.0).toFloat(), s.optLong("startMs", 0L), s.optLong("endMs", 0L), s.optString("groupId").ifBlank { null })
         } }
     )
 }

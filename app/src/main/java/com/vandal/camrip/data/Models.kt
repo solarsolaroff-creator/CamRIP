@@ -7,7 +7,8 @@ data class Project(
     val updatedAt: Long,
     val clips: List<Clip> = emptyList(),
     val effects: List<EffectItem> = emptyList(),
-    val models3d: List<Model3DItem> = emptyList()
+    val models3d: List<Model3DItem> = emptyList(),
+    val shapes: List<ShapeItem> = emptyList()
 )
 
 data class Clip(
@@ -52,4 +53,19 @@ data class Model3DItem(
     val scale: Float = 1f,
     val groupId: String? = null,
     val startMs: Long = 0L
+)
+
+data class ShapeItem(
+    val id: Long,
+    val clipId: Long,
+    val type: String, // rect, circle, line
+    val x: Float = 0.2f,
+    val y: Float = 0.2f,
+    val w: Float = 0.3f,
+    val h: Float = 0.2f,
+    val color: Long = 0xFFFF4FD8,
+    val stroke: Float = 8f,
+    val startMs: Long = 0L,
+    val endMs: Long = 0L,
+    val groupId: String? = null
 )
