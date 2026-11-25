@@ -94,6 +94,7 @@ fun EditorScreen(
     var selectedItem by remember { mutableStateOf<Pair<String, Long>?>(null) } // type,id
     var groupPick by remember { mutableStateOf<Pair<String, Long>?>(null) }
     var contextMenuItem by remember { mutableStateOf<Pair<String, Long>?>(null) }
+    var timelineZoom by remember { mutableStateOf(1f) }
     val latestProject by rememberUpdatedState(project)
 
     val selectedClip = project.clips.firstOrNull { it.id == selectedClipId } ?: project.clips.firstOrNull()
@@ -259,9 +260,16 @@ fun EditorScreen(
                 Modifier.fillMaxWidth().heightIn(min = 260.dp, max = 430.dp).background(MaterialTheme.colorScheme.surfaceVariant).padding(10.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Видеодорожка (Video Track)", style = MaterialTheme.typography.labelLarge)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Видеодорожка (Video Track)", style = MaterialTheme.typography.labelLarge)
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = { timelineZoom = (timelineZoom - 0.25f).coerceAtLeast(0.5f) }) { Text("-") }
+                        Text("${"%.1f".format(timelineZoom)}x", style = MaterialTheme.typography.labelSmall)
+                        TextButton(onClick = { timelineZoom = (timelineZoom + 0.25f).coerceAtMost(3f) }) { Text("+") }
+                    }
+                }
                 val totalMs = durationMs.coerceAtLeast(10_000L)
-                val pxPerMs = 0.12f
+                val pxPerMs = 0.12f * timelineZoom
                 val timelineWidth = (totalMs * pxPerMs).dp
                 val dens = androidx.compose.ui.platform.LocalDensity.current.density
 
@@ -290,12 +298,12 @@ fun EditorScreen(
                                 Text("Видео", color = Color.White, style = MaterialTheme.typography.labelSmall)
                                 Row(Modifier.height(34.dp)) {
                                     project.clips.forEachIndexed { idx, clip ->
-                                        val w = ((clip.durationMs.takeIf { it > 0 } ?: 4000L) * pxPerMs).dp
+                                        val dur = ((if (clip.endMs > 0) clip.endMs else (clip.durationMs.takeIf { it > 0 } ?: 4000L)) - clip.startMs).coerceAtLeast(500L); val w = (dur * pxPerMs).dp
                                         val sel = selectedItem == ("clip" to clip.id) || selectedClipId == clip.id
                                         Box(
                                             Modifier.padding(end = 4.dp).width(w).fillMaxHeight().background(if (sel) MaterialTheme.colorScheme.primary else Color(0xFF3A6EA5), RoundedCornerShape(8.dp))
                                                 .combinedClickable(onClick = { selectedClipId = clip.id; selectedItem = "clip" to clip.id }, onLongClick = { contextMenuItem = "clip" to clip.id })
-                                                .pointerInput(clip.id) { detectDragGestures { c, drag -> c.consume(); project = moveTimelineItem(project, "clip", clip.id, (drag.x / (pxPerMs * dens)).toLong()) } },
+                                                .pointerInput(clip.id) { detectDragGestures { c, drag -> c.consume(); project = moveTimelineItem(project, "clip", clip.id, (drag.x / (pxPerMs * dens)).toLong(), playheadMs) } },
                                             contentAlignment = Alignment.Center
                                         ) { Text(clip.label, maxLines = 1, style = MaterialTheme.typography.labelSmall, color = Color.White) }
                                     }
@@ -310,7 +318,7 @@ fun EditorScreen(
                                         Box(
                                             Modifier.width(88.dp).fillMaxHeight().background(if (sel) MaterialTheme.colorScheme.secondary else Color(0xFF7A4FA5), RoundedCornerShape(8.dp))
                                                 .combinedClickable(onClick = { selectedItem = "effect" to e.id }, onLongClick = { contextMenuItem = "effect" to e.id })
-                                                .pointerInput(e.id) { detectDragGestures { c, drag -> c.consume(); project = moveTimelineItem(project, "effect", e.id, (drag.x / (pxPerMs * dens)).toLong()); repo.saveProject(project) } },
+                                                .pointerInput(e.id) { detectDragGestures { c, drag -> c.consume(); project = moveTimelineItem(project, "effect", e.id, (drag.x / (pxPerMs * dens)).toLong(), playheadMs); repo.saveProject(project) } },
                                             contentAlignment = Alignment.Center
                                         ) { Text(e.type, maxLines = 1, style = MaterialTheme.typography.labelSmall, color = Color.White) }
                                     }
@@ -325,7 +333,7 @@ fun EditorScreen(
                                         Box(
                                             Modifier.width(88.dp).fillMaxHeight().background(if (sel) MaterialTheme.colorScheme.tertiary else Color(0xFF2F8A6B), RoundedCornerShape(8.dp))
                                                 .combinedClickable(onClick = { selectedItem = "model3d" to m.id; selectedModel3dId = m.id }, onLongClick = { contextMenuItem = "model3d" to m.id })
-                                                .pointerInput(m.id) { detectDragGestures { c, drag -> c.consume(); project = moveTimelineItem(project, "model3d", m.id, (drag.x / (pxPerMs * dens)).toLong()); repo.saveProject(project) } },
+                                                .pointerInput(m.id) { detectDragGestures { c, drag -> c.consume(); project = moveTimelineItem(project, "model3d", m.id, (drag.x / (pxPerMs * dens)).toLong(), playheadMs); repo.saveProject(project) } },
                                             contentAlignment = Alignment.Center
                                         ) { Text(m.name.take(8), maxLines = 1, style = MaterialTheme.typography.labelSmall, color = Color.White) }
                                     }
@@ -338,8 +346,22 @@ fun EditorScreen(
                 selectedItem?.let { (type, id) ->
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("Переместить:", style = MaterialTheme.typography.bodySmall)
-                        TextButton(onClick = { project = moveTimelineItem(project, type, id, -500); repo.saveProject(project) }) { Text("←") }
-                        TextButton(onClick = { project = moveTimelineItem(project, type, id, 500); repo.saveProject(project) }) { Text("→") }
+                        TextButton(onClick = { project = moveTimelineItem(project, type, id, -500, playheadMs); repo.saveProject(project) }) { Text("←") }
+                        TextButton(onClick = { project = moveTimelineItem(project, type, id, 500, playheadMs); repo.saveProject(project) }) { Text("→") }
+                    }
+                }
+
+                if (selectedItem?.first == "clip") {
+                    val clip = project.clips.firstOrNull { it.id == selectedItem?.second }
+                    if (clip != null) {
+                        fun updClip(mut: (Clip) -> Clip) { project = project.copy(clips = project.clips.map { if (it.id == clip.id) mut(it) else it }); repo.saveProject(project) }
+                        Text("Обрезка (Trim): ${formatMs(clip.startMs)} - ${if (clip.endMs > 0) formatMs(clip.endMs) else "конец"}", style = MaterialTheme.typography.bodySmall)
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            TextButton(onClick = { updClip { it.copy(startMs = (it.startMs - 250).coerceAtLeast(0L)) } }) { Text("In-") }
+                            TextButton(onClick = { updClip { it.copy(startMs = (it.startMs + 250).coerceAtLeast(0L)) } }) { Text("In+") }
+                            TextButton(onClick = { val e = if (itEnd(clip, durationMs) - 250 > clip.startMs) itEnd(clip, durationMs) - 250 else itEnd(clip, durationMs); updClip { c -> c.copy(endMs = e) } }) { Text("Out-") }
+                            TextButton(onClick = { updClip { c -> c.copy(endMs = (itEnd(c, durationMs) + 250).coerceAtLeast(c.startMs + 250)) } }) { Text("Out+") }
+                        }
                     }
                 }
 
@@ -472,7 +494,13 @@ fun exportClip(context: Context, clip: Clip, effects: List<EffectItem>, onDone: 
         baseEffects += ScaleAndRotateTransformation.Builder().setScale(clip.scale.coerceAtLeast(0.1f), clip.scale.coerceAtLeast(0.1f)).setRotationDegrees(clip.rotation).build()
     }
     val videoEffects = baseEffects + effects.flatMap { it.toMedia3Effects() }
-    val edited = EditedMediaItem.Builder(MediaItem.fromUri(Uri.parse(clip.uri))).setEffects(Effects(emptyList(), videoEffects)).build()
+    val mediaItemBuilder = MediaItem.Builder().setUri(Uri.parse(clip.uri))
+    if (clip.startMs > 0 || clip.endMs > 0) {
+        val clipBuilder = MediaItem.ClippingConfiguration.Builder().setStartPositionMs(clip.startMs.coerceAtLeast(0L))
+        if (clip.endMs > 0) clipBuilder.setEndPositionMs(clip.endMs)
+        mediaItemBuilder.setClippingConfiguration(clipBuilder.build())
+    }
+    val edited = EditedMediaItem.Builder(mediaItemBuilder.build()).setEffects(Effects(emptyList(), videoEffects)).build()
     val transformer = Transformer.Builder(context).addListener(object : Transformer.Listener {
         override fun onCompleted(composition: Composition, exportResult: ExportResult) {
             val ok = saveToGallery(context, outFile)
@@ -517,7 +545,14 @@ fun importModelToFilesDir(context: Context, uri: Uri): File? {
     } catch (_: Exception) { null }
 }
 
-fun moveTimelineItem(project: Project, type: String, id: Long, deltaMs: Long): Project {
+fun itEnd(clip: Clip, durationMs: Long): Long = if (clip.endMs > 0) clip.endMs else durationMs.coerceAtLeast(clip.startMs + 1000L)
+
+fun snapMs(ms: Long, playheadMs: Long): Long {
+    val grid = ((ms + 125) / 250) * 250
+    return if (kotlin.math.abs(grid - playheadMs) < 200) playheadMs else grid.coerceAtLeast(0L)
+}
+
+fun moveTimelineItem(project: Project, type: String, id: Long, deltaMs: Long, playheadMs: Long = 0L): Project {
     return when (type) {
         "clip" -> {
             val list = project.clips.toMutableList()
@@ -529,8 +564,8 @@ fun moveTimelineItem(project: Project, type: String, id: Long, deltaMs: Long): P
             list.add(target, item)
             project.copy(clips = list)
         }
-        "effect" -> project.copy(effects = project.effects.map { if (it.id == id) it.copy(startMs = (it.startMs + deltaMs).coerceAtLeast(0L)) else it })
-        "model3d" -> project.copy(models3d = project.models3d.map { if (it.id == id) it.copy(startMs = (it.startMs + deltaMs).coerceAtLeast(0L)) else it })
+        "effect" -> project.copy(effects = project.effects.map { if (it.id == id) it.copy(startMs = snapMs(it.startMs + deltaMs, playheadMs)) else it })
+        "model3d" -> project.copy(models3d = project.models3d.map { if (it.id == id) it.copy(startMs = snapMs(it.startMs + deltaMs, playheadMs)) else it })
         else -> project
     }
 }
