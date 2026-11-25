@@ -42,7 +42,7 @@ fun HomeScreen(
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = {
-                    val p = Project(id = System.currentTimeMillis(), name = "Проект ${projects.size + 1}", createdAt = System.currentTimeMillis(), updatedAt = System.currentTimeMillis())
+                    val p = Project(id = System.currentTimeMillis(), name = randomProjectName(), createdAt = System.currentTimeMillis(), updatedAt = System.currentTimeMillis())
                     repo.saveProject(p)
                     projects = repo.loadProjects()
                     onOpenProject(p.id)
@@ -85,3 +85,8 @@ fun HomeScreen(
 }
 
 private fun formatDate(ts: Long): String = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(Date(ts))
+
+private fun randomProjectName(): String {
+    val chars = ('a'..'z') + ('0'..'9')
+    return (1..(10..16).random()).map { chars.random() }.joinToString("")
+}

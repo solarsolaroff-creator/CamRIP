@@ -78,7 +78,7 @@ fun EditorScreen(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
-    var project by remember { mutableStateOf(repo.getProject(projectId) ?: Project(projectId, "Проект", System.currentTimeMillis(), System.currentTimeMillis())) }
+    var project by remember { mutableStateOf(repo.getProject(projectId) ?: Project(projectId, "proj_${System.currentTimeMillis().toString(36)}", System.currentTimeMillis(), System.currentTimeMillis())) }
     var selectedClipId by remember { mutableStateOf(project.clips.firstOrNull()?.id) }
     var showSheet by remember { mutableStateOf(false) }
     var isPlaying by remember { mutableStateOf(false) }
