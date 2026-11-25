@@ -629,7 +629,6 @@ fun exportClip(context: Context, clip: Clip, effects: List<EffectItem>, shapes: 
         mediaItemBuilder.setClippingConfiguration(clipBuilder.build())
     }
     val edited = EditedMediaItem.Builder(mediaItemBuilder.build())
-        .setVolume(clip.volume.coerceIn(0f, 2f))
         .setEffects(Effects(emptyList(), videoEffects))
         .build()
     val transformer = Transformer.Builder(context).addListener(object : Transformer.Listener {
