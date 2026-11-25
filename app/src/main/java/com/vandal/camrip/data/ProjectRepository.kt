@@ -51,7 +51,7 @@ private fun Project.toJson(): JSONObject = JSONObject().apply {
         put(JSONObject().apply {
             put("id", e.id); put("clipId", e.clipId); put("type", e.type)
             put("intensity", e.intensity.toDouble()); put("angleX", e.angleX.toDouble()); put("angleY", e.angleY.toDouble()); put("angleZ", e.angleZ.toDouble())
-            put("scale", e.scale.toDouble()); put("speed", e.speed.toDouble()); put("groupId", e.groupId ?: "")
+            put("scale", e.scale.toDouble()); put("speed", e.speed.toDouble()); put("groupId", e.groupId ?: ""); put("startMs", e.startMs)
         })
     }})
     put("models3d", JSONArray().apply { models3d.forEach { m ->
@@ -59,7 +59,7 @@ private fun Project.toJson(): JSONObject = JSONObject().apply {
             put("id", m.id); put("clipId", m.clipId); put("name", m.name); put("filePath", m.filePath)
             put("posX", m.posX.toDouble()); put("posY", m.posY.toDouble()); put("posZ", m.posZ.toDouble())
             put("rotX", m.rotX.toDouble()); put("rotY", m.rotY.toDouble()); put("rotZ", m.rotZ.toDouble()); put("scale", m.scale.toDouble())
-            put("groupId", m.groupId ?: "")
+            put("groupId", m.groupId ?: ""); put("startMs", m.startMs)
         })
     }})
 }
@@ -74,10 +74,10 @@ private fun JSONObject.toProject(): Project {
             Clip(c.optLong("id"), c.optString("uri"), c.optLong("startMs"), c.optLong("endMs"), c.optLong("durationMs"), c.optString("label", "Клип"), c.optString("groupId").ifBlank { null }, c.optDouble("offsetX", 0.0).toFloat(), c.optDouble("offsetY", 0.0).toFloat(), c.optDouble("scale", 1.0).toFloat(), c.optDouble("rotation", 0.0).toFloat())
         } },
         effects = (0 until effectsArr.length()).map { i -> effectsArr.getJSONObject(i).let { e ->
-            EffectItem(e.optLong("id"), e.optLong("clipId"), e.optString("type"), e.optDouble("intensity", 0.5).toFloat(), e.optDouble("angleX", 0.0).toFloat(), e.optDouble("angleY", 0.0).toFloat(), e.optDouble("angleZ", 0.0).toFloat(), e.optDouble("scale", 1.0).toFloat(), e.optDouble("speed", 1.0).toFloat(), e.optString("groupId").ifBlank { null })
+            EffectItem(e.optLong("id"), e.optLong("clipId"), e.optString("type"), e.optDouble("intensity", 0.5).toFloat(), e.optDouble("angleX", 0.0).toFloat(), e.optDouble("angleY", 0.0).toFloat(), e.optDouble("angleZ", 0.0).toFloat(), e.optDouble("scale", 1.0).toFloat(), e.optDouble("speed", 1.0).toFloat(), e.optString("groupId").ifBlank { null }, e.optLong("startMs", 0L))
         } },
         models3d = (0 until modelsArr.length()).map { i -> modelsArr.getJSONObject(i).let { m ->
-            Model3DItem(m.optLong("id"), m.optLong("clipId"), m.optString("name"), m.optString("filePath"), m.optDouble("posX", 0.0).toFloat(), m.optDouble("posY", 0.0).toFloat(), m.optDouble("posZ", -2.0).toFloat(), m.optDouble("rotX", 0.0).toFloat(), m.optDouble("rotY", 0.0).toFloat(), m.optDouble("rotZ", 0.0).toFloat(), m.optDouble("scale", 1.0).toFloat(), m.optString("groupId").ifBlank { null })
+            Model3DItem(m.optLong("id"), m.optLong("clipId"), m.optString("name"), m.optString("filePath"), m.optDouble("posX", 0.0).toFloat(), m.optDouble("posY", 0.0).toFloat(), m.optDouble("posZ", -2.0).toFloat(), m.optDouble("rotX", 0.0).toFloat(), m.optDouble("rotY", 0.0).toFloat(), m.optDouble("rotZ", 0.0).toFloat(), m.optDouble("scale", 1.0).toFloat(), m.optString("groupId").ifBlank { null }, m.optLong("startMs", 0L))
         } }
     )
 }

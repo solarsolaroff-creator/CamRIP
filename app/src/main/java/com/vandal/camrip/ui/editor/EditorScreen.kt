@@ -258,8 +258,29 @@ fun EditorScreen(
                 Modifier.fillMaxWidth().heightIn(min = 230.dp, max = 390.dp).background(MaterialTheme.colorScheme.surfaceVariant).verticalScroll(rememberScrollState()).padding(10.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Таймлайн / дорожки", style = MaterialTheme.typography.labelLarge)
+                Text("Видеодорожка (Video Track) / Таймлайн", style = MaterialTheme.typography.labelLarge)
                 Slider(value = playheadMs.toFloat(), onValueChange = { playheadMs = it.toLong(); player?.seekTo(playheadMs) }, valueRange = 0f..(durationMs.coerceAtLeast(1L).toFloat()))
+
+                selectedItem?.let { (type, id) ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Переместить:", style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = {
+                            project = moveTimelineItem(project, type, id, -500)
+                            repo.saveProject(project)
+                        }) { Text("←") }
+                        TextButton(onClick = {
+                            project = moveTimelineItem(project, type, id, 500)
+                            repo.saveProject(project)
+                        }) { Text("→") }
+                        val label = when (type) {
+                            "clip" -> project.clips.firstOrNull { it.id == id }?.label ?: "клип"
+                            "effect" -> project.effects.firstOrNull { it.id == id }?.type ?: "эффект"
+                            "model3d" -> project.models3d.firstOrNull { it.id == id }?.name ?: "3D"
+                            else -> type
+                        }
+                        Text(label, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
 
                 Text("Видео", style = MaterialTheme.typography.titleSmall)
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -277,7 +298,7 @@ fun EditorScreen(
                     items(clipEffects, key = { it.id }) { e ->
                         val sel = selectedItem == ("effect" to e.id)
                         Box(Modifier.combinedClickable(onClick = { selectedItem = "effect" to e.id }, onLongClick = { contextMenuItem = "effect" to e.id })) {
-                            FilterChip(selected = sel, onClick = { selectedItem = "effect" to e.id }, label = { Text(e.type + (e.groupId?.let { " [G]" } ?: "")) })
+                            FilterChip(selected = sel, onClick = { selectedItem = "effect" to e.id }, label = { Text("${e.type} @${formatMs(e.startMs)}${e.groupId?.let { " [G]" } ?: ""}") })
                         }
                     }
                 }
@@ -288,7 +309,7 @@ fun EditorScreen(
                     items(clipModels, key = { it.id }) { m ->
                         val sel = selectedItem == ("model3d" to m.id)
                         Box(Modifier.combinedClickable(onClick = { selectedItem = "model3d" to m.id; selectedModel3dId = m.id }, onLongClick = { contextMenuItem = "model3d" to m.id })) {
-                            FilterChip(selected = sel, onClick = { selectedItem = "model3d" to m.id; selectedModel3dId = m.id }, label = { Text(m.name.take(10) + (m.groupId?.let { " [G]" } ?: "")) })
+                            FilterChip(selected = sel, onClick = { selectedItem = "model3d" to m.id; selectedModel3dId = m.id }, label = { Text("${m.name.take(8)} @${formatMs(m.startMs)}${m.groupId?.let { " [G]" } ?: ""}") })
                         }
                     }
                 }
@@ -476,6 +497,24 @@ fun importModelToFilesDir(context: Context, uri: Uri): File? {
         context.contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(out).use { input.copyTo(it) } } ?: return null
         out
     } catch (_: Exception) { null }
+}
+
+fun moveTimelineItem(project: Project, type: String, id: Long, deltaMs: Long): Project {
+    return when (type) {
+        "clip" -> {
+            val list = project.clips.toMutableList()
+            val idx = list.indexOfFirst { it.id == id }
+            if (idx < 0) return project
+            val target = if (deltaMs < 0) idx - 1 else idx + 1
+            if (target !in list.indices) return project
+            val item = list.removeAt(idx)
+            list.add(target, item)
+            project.copy(clips = list)
+        }
+        "effect" -> project.copy(effects = project.effects.map { if (it.id == id) it.copy(startMs = (it.startMs + deltaMs).coerceAtLeast(0L)) else it })
+        "model3d" -> project.copy(models3d = project.models3d.map { if (it.id == id) it.copy(startMs = (it.startMs + deltaMs).coerceAtLeast(0L)) else it })
+        else -> project
+    }
 }
 
 fun formatMs(ms: Long): String {

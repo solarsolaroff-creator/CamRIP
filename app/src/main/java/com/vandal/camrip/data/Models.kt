@@ -34,7 +34,8 @@ data class EffectItem(
     val angleZ: Float = 0f,
     val scale: Float = 1f,
     val speed: Float = 1f,
-    val groupId: String? = null
+    val groupId: String? = null,
+    val startMs: Long = 0L
 )
 
 data class Model3DItem(
@@ -49,5 +50,6 @@ data class Model3DItem(
     val rotY: Float = 0f,
     val rotZ: Float = 0f,
     val scale: Float = 1f,
-    val groupId: String? = null
+    val groupId: String? = null,
+    val startMs: Long = 0L
 )
