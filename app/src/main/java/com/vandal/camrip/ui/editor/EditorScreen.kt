@@ -219,21 +219,22 @@ fun Model3DOverlay(models: List<Model3DItem>) {
     if (models.isEmpty()) return
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
-    var nodes by remember { mutableStateOf(listOf<ModelNode>()) }
+    var nodes by remember(models) { mutableStateOf(listOf<ModelNode>()) }
 
-    LaunchedEffect(models.map { it.filePath + it.scale + it.rotY }) {
-        val loaded = withContext(Dispatchers.IO) {
+    LaunchedEffect(models.map { it.filePath + it.scale + it.rotX + it.rotY + it.rotZ }) {
+        val loaded = withContext(Dispatchers.Main) {
             models.mapNotNull { m ->
                 try {
                     val f = File(m.filePath)
                     if (!f.exists()) return@mapNotNull null
-                    modelLoader.createModelInstance(f)?.let { instance ->
-                        ModelNode(modelInstance = instance, scaleToUnits = m.scale.coerceAtLeast(0.1f)).apply {
-                            position = Position(m.posX, m.posY, m.posZ)
-                            rotation = Rotation(m.rotX, m.rotY, m.rotZ)
-                        }
+                    val instance = modelLoader.createModelInstance("file://${f.absolutePath}")
+                        ?: modelLoader.createModelInstance(f.absolutePath)
+                        ?: return@mapNotNull null
+                    ModelNode(modelInstance = instance, scaleToUnits = m.scale.coerceAtLeast(0.1f)).apply {
+                        position = Position(m.posX, m.posY, m.posZ)
+                        rotation = Rotation(m.rotX, m.rotY, m.rotZ)
                     }
-                } catch (_: Exception) { null }
+                } catch (_: Throwable) { null }
             }
         }
         nodes = loaded
@@ -244,7 +245,7 @@ fun Model3DOverlay(models: List<Model3DItem>) {
         engine = engine,
         modelLoader = modelLoader,
         childNodes = nodes,
-        onViewCreated = { this.scene.skybox = null }
+        onViewCreated = { scene.skybox = null }
     )
 }
 
