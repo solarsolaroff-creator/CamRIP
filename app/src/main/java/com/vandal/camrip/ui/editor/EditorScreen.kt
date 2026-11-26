@@ -207,6 +207,18 @@ fun EditorScreen(
                         repo.saveProject(project); showSheet = false
                     }, enabled = selectedClip != null, modifier = Modifier.weight(1f)) { Text("Линия") }
                 }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { val c = selectedClip ?: return@Button; project = project.copy(shapes = project.shapes + ShapeItem(System.currentTimeMillis(), c.id, "diamond", 0.3f,0.25f,0.25f,0.25f, 0xFFB388FF,8f,playheadMs,0L,null,true)); repo.saveProject(project); showSheet=false }, enabled = selectedClip!=null, modifier=Modifier.weight(1f)) { Text("Ромб") }
+                    Button(onClick = { val c = selectedClip ?: return@Button; project = project.copy(shapes = project.shapes + ShapeItem(System.currentTimeMillis(), c.id, "star", 0.3f,0.25f,0.25f,0.25f, 0xFFFFD54F,8f,playheadMs,0L,null,true)); repo.saveProject(project); showSheet=false }, enabled = selectedClip!=null, modifier=Modifier.weight(1f)) { Text("Звезда") }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { val c = selectedClip ?: return@Button; project = project.copy(shapes = project.shapes + ShapeItem(System.currentTimeMillis(), c.id, "hexagon", 0.3f,0.25f,0.28f,0.24f, 0xFF4DD0E1,8f,playheadMs,0L,null,true)); repo.saveProject(project); showSheet=false }, enabled = selectedClip!=null, modifier=Modifier.weight(1f)) { Text("Шестиуг.") }
+                    Button(onClick = { val c = selectedClip ?: return@Button; project = project.copy(shapes = project.shapes + ShapeItem(System.currentTimeMillis(), c.id, "arrow", 0.2f,0.35f,0.4f,0.2f, 0xFFFF8A65,8f,playheadMs,0L,null,true)); repo.saveProject(project); showSheet=false }, enabled = selectedClip!=null, modifier=Modifier.weight(1f)) { Text("Стрелка") }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { val c = selectedClip ?: return@Button; project = project.copy(shapes = project.shapes + ShapeItem(System.currentTimeMillis(), c.id, "pill", 0.25f,0.4f,0.4f,0.15f, 0xFFA5D6A7,8f,playheadMs,0L,null,true)); repo.saveProject(project); showSheet=false }, enabled = selectedClip!=null, modifier=Modifier.weight(1f)) { Text("Пилюля") }
+                    Button(onClick = { val c = selectedClip ?: return@Button; project = project.copy(shapes = project.shapes + ShapeItem(System.currentTimeMillis(), c.id, "pentagon", 0.3f,0.25f,0.26f,0.24f, 0xFF90CAF9,8f,playheadMs,0L,null,true)); repo.saveProject(project); showSheet=false }, enabled = selectedClip!=null, modifier=Modifier.weight(1f)) { Text("Пятиуг.") }
+                }
                 Spacer(Modifier.height(20.dp))
             }
         }
@@ -520,6 +532,34 @@ fun EditorScreen(
     }
 }
 
+fun regularPolygonPath(left: Float, top: Float, w: Float, h: Float, sides: Int): androidx.compose.ui.graphics.Path {
+    val cx = left + w / 2f; val cy = top + h / 2f; val rx = w / 2f; val ry = h / 2f
+    return androidx.compose.ui.graphics.Path().apply {
+        for (i in 0 until sides) {
+            val a = -Math.PI / 2 + i * 2 * Math.PI / sides
+            val x = cx + (rx * kotlin.math.cos(a)).toFloat()
+            val y = cy + (ry * kotlin.math.sin(a)).toFloat()
+            if (i == 0) moveTo(x, y) else lineTo(x, y)
+        }
+        close()
+    }
+}
+
+fun starPath(left: Float, top: Float, w: Float, h: Float, points: Int): androidx.compose.ui.graphics.Path {
+    val cx = left + w / 2f; val cy = top + h / 2f; val rx = w / 2f; val ry = h / 2f
+    return androidx.compose.ui.graphics.Path().apply {
+        for (i in 0 until points * 2) {
+            val rrx = if (i % 2 == 0) rx else rx * 0.45f
+            val rry = if (i % 2 == 0) ry else ry * 0.45f
+            val a = -Math.PI / 2 + i * Math.PI / points
+            val x = cx + (rrx * kotlin.math.cos(a)).toFloat()
+            val y = cy + (rry * kotlin.math.sin(a)).toFloat()
+            if (i == 0) moveTo(x, y) else lineTo(x, y)
+        }
+        close()
+    }
+}
+
 @Composable
 fun ShapeOverlay(shapes: List<ShapeItem>, playheadMs: Long, onMove: (Long, Float, Float, Float, Float) -> Unit = { _, _, _, _, _ -> }, onMoveEnd: () -> Unit = {}) {
     var selectedId by remember { mutableStateOf<Long?>(null) }
@@ -552,13 +592,29 @@ fun ShapeOverlay(shapes: List<ShapeItem>, playheadMs: Long, onMove: (Long, Float
             val h = s.h * size.height
             val style = if (s.filled && s.type != "line") androidx.compose.ui.graphics.drawscope.Fill else androidx.compose.ui.graphics.drawscope.Stroke(width = s.stroke)
             when (s.type) {
-                "circle" -> drawOval(color = color, topLeft = androidx.compose.ui.geometry.Offset(left, top), size = androidx.compose.ui.geometry.Size(w, h), style = style)
+                "circle", "oval" -> drawOval(color = color, topLeft = androidx.compose.ui.geometry.Offset(left, top), size = androidx.compose.ui.geometry.Size(w, h), style = style)
                 "triangle" -> {
                     val path = androidx.compose.ui.graphics.Path().apply { moveTo(left + w / 2f, top); lineTo(left + w, top + h); lineTo(left, top + h); close() }
                     drawPath(path, color = color, style = style)
                 }
+                "diamond" -> {
+                    val path = androidx.compose.ui.graphics.Path().apply { moveTo(left + w/2f, top); lineTo(left + w, top + h/2f); lineTo(left + w/2f, top + h); lineTo(left, top + h/2f); close() }
+                    drawPath(path, color = color, style = style)
+                }
+                "pentagon" -> { val path = regularPolygonPath(left, top, w, h, 5); drawPath(path, color = color, style = style) }
+                "hexagon" -> { val path = regularPolygonPath(left, top, w, h, 6); drawPath(path, color = color, style = style) }
+                "star" -> { val path = starPath(left, top, w, h, 5); drawPath(path, color = color, style = style) }
+                "arrow" -> {
+                    val path = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(left, top + h*0.35f); lineTo(left + w*0.65f, top + h*0.35f); lineTo(left + w*0.65f, top)
+                        lineTo(left + w, top + h*0.5f); lineTo(left + w*0.65f, top + h); lineTo(left + w*0.65f, top + h*0.65f)
+                        lineTo(left, top + h*0.65f); close()
+                    }
+                    drawPath(path, color = color, style = style)
+                }
+                "pill" -> drawRoundRect(color = color, topLeft = androidx.compose.ui.geometry.Offset(left, top), size = androidx.compose.ui.geometry.Size(w, h), cornerRadius = androidx.compose.ui.geometry.CornerRadius(h/2f, h/2f), style = style)
                 "line" -> drawLine(color = color, start = androidx.compose.ui.geometry.Offset(left, top + h / 2f), end = androidx.compose.ui.geometry.Offset(left + w, top + h / 2f), strokeWidth = s.stroke)
-                else -> drawRect(color = color, topLeft = androidx.compose.ui.geometry.Offset(left, top), size = androidx.compose.ui.geometry.Size(w, h), style = style)
+                else -> drawRoundRect(color = color, topLeft = androidx.compose.ui.geometry.Offset(left, top), size = androidx.compose.ui.geometry.Size(w, h), cornerRadius = androidx.compose.ui.geometry.CornerRadius(16f,16f), style = style)
             }
             if (selectedId == s.id) {
                 drawRect(color = Color.White.copy(alpha = 0.8f), topLeft = androidx.compose.ui.geometry.Offset(left, top), size = androidx.compose.ui.geometry.Size(w, h), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f))
@@ -619,6 +675,30 @@ fun EffectItem.toMedia3Effects(): List<Effect> = when (type) {
     else -> emptyList()
 }
 
+fun androidRegularPolygon(left: Float, top: Float, w: Float, h: Float, sides: Int): android.graphics.Path {
+    val cx = left + w/2f; val cy = top + h/2f; val rx = w/2f; val ry = h/2f
+    return android.graphics.Path().apply {
+        for (i in 0 until sides) {
+            val a = -Math.PI/2 + i*2*Math.PI/sides
+            val x = cx + (rx*kotlin.math.cos(a)).toFloat(); val y = cy + (ry*kotlin.math.sin(a)).toFloat()
+            if (i==0) moveTo(x,y) else lineTo(x,y)
+        }
+        close()
+    }
+}
+fun androidStar(left: Float, top: Float, w: Float, h: Float, points: Int): android.graphics.Path {
+    val cx = left + w/2f; val cy = top + h/2f; val rx = w/2f; val ry = h/2f
+    return android.graphics.Path().apply {
+        for (i in 0 until points*2) {
+            val rrx = if (i%2==0) rx else rx*0.45f; val rry = if (i%2==0) ry else ry*0.45f
+            val a = -Math.PI/2 + i*Math.PI/points
+            val x = cx + (rrx*kotlin.math.cos(a)).toFloat(); val y = cy + (rry*kotlin.math.sin(a)).toFloat()
+            if (i==0) moveTo(x,y) else lineTo(x,y)
+        }
+        close()
+    }
+}
+
 @UnstableApi
 class GainAudioProcessor(private val gain: Float) : androidx.media3.common.audio.BaseAudioProcessor() {
     override fun onConfigure(inputAudioFormat: androidx.media3.common.audio.AudioProcessor.AudioFormat): androidx.media3.common.audio.AudioProcessor.AudioFormat {
@@ -665,14 +745,18 @@ fun exportClip(context: Context, clip: Clip, effects: List<EffectItem>, shapes: 
                         p.color = s.color.toInt(); p.strokeWidth = s.stroke
                         p.style = if (s.filled && s.type != "line") android.graphics.Paint.Style.FILL else android.graphics.Paint.Style.STROKE
                         val l = s.x * 1080f; val top = s.y * 1920f; val r = (s.x + s.w) * 1080f; val b = (s.y + s.h) * 1920f
+                        val bw = r-l; val bh = b-top; val cx = l + bw/2f; val cy = top + bh/2f
                         when (s.type) {
-                            "circle" -> c.drawOval(l, top, r, b, p)
-                            "triangle" -> {
-                                val path = android.graphics.Path().apply { moveTo(l + (r-l)/2f, top); lineTo(r, b); lineTo(l, b); close() }
-                                c.drawPath(path, p)
-                            }
-                            "line" -> c.drawLine(l, top + (b-top)/2f, r, top + (b-top)/2f, p)
-                            else -> c.drawRect(l, top, r, b, p)
+                            "circle", "oval" -> c.drawOval(l, top, r, b, p)
+                            "triangle" -> { val path = android.graphics.Path().apply { moveTo(cx, top); lineTo(r, b); lineTo(l, b); close() }; c.drawPath(path, p) }
+                            "diamond" -> { val path = android.graphics.Path().apply { moveTo(cx, top); lineTo(r, cy); lineTo(cx, b); lineTo(l, cy); close() }; c.drawPath(path, p) }
+                            "pentagon" -> c.drawPath(androidRegularPolygon(l,top,bw,bh,5), p)
+                            "hexagon" -> c.drawPath(androidRegularPolygon(l,top,bw,bh,6), p)
+                            "star" -> c.drawPath(androidStar(l,top,bw,bh,5), p)
+                            "arrow" -> { val path = android.graphics.Path().apply { moveTo(l, top+bh*0.35f); lineTo(l+bw*0.65f, top+bh*0.35f); lineTo(l+bw*0.65f, top); lineTo(r, cy); lineTo(l+bw*0.65f, b); lineTo(l+bw*0.65f, top+bh*0.65f); lineTo(l, top+bh*0.65f); close() }; c.drawPath(path,p) }
+                            "pill" -> c.drawRoundRect(l, top, r, b, bh/2f, bh/2f, p)
+                            "line" -> c.drawLine(l, cy, r, cy, p)
+                            else -> c.drawRoundRect(l, top, r, b, 16f, 16f, p)
                         }
                     }
                     return bmp
