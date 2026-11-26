@@ -619,6 +619,29 @@ fun EffectItem.toMedia3Effects(): List<Effect> = when (type) {
     else -> emptyList()
 }
 
+@UnstableApi
+class GainAudioProcessor(private val gain: Float) : androidx.media3.common.audio.BaseAudioProcessor() {
+    override fun onConfigure(inputAudioFormat: androidx.media3.common.audio.AudioProcessor.AudioFormat): androidx.media3.common.audio.AudioProcessor.AudioFormat {
+        if (inputAudioFormat.encoding != androidx.media3.common.C.ENCODING_PCM_16BIT) return androidx.media3.common.audio.AudioProcessor.AudioFormat.NOT_SET
+        return inputAudioFormat
+    }
+    override fun queueInput(inputBuffer: java.nio.ByteBuffer) {
+        val remaining = inputBuffer.remaining()
+        if (remaining == 0) return
+        val out = replaceOutputBuffer(remaining)
+        while (inputBuffer.remaining() >= 2) {
+            val lo = inputBuffer.get().toInt() and 0xFF
+            val hi = inputBuffer.get().toInt()
+            var sample = (hi shl 8) or lo
+            if (sample >= 32768) sample -= 65536
+            val boosted = (sample * gain).toInt().coerceIn(-32768, 32767)
+            out.put((boosted and 0xFF).toByte())
+            out.put(((boosted shr 8) and 0xFF).toByte())
+        }
+        out.flip()
+    }
+}
+
 @androidx.annotation.OptIn(UnstableApi::class)
 fun exportClip(context: Context, clip: Clip, effects: List<EffectItem>, shapes: List<ShapeItem>, onDone: (Boolean, String) -> Unit) {
     val outFile = File(context.cacheDir, "export_${System.currentTimeMillis()}.mp4")
@@ -664,8 +687,9 @@ fun exportClip(context: Context, clip: Clip, effects: List<EffectItem>, shapes: 
         if (clip.endMs > 0) clipBuilder.setEndPositionMs(clip.endMs)
         mediaItemBuilder.setClippingConfiguration(clipBuilder.build())
     }
+    val audioProcessors = if (clip.volume != 1f) listOf(GainAudioProcessor(clip.volume.coerceIn(0f, 100f))) else emptyList()
     val edited = EditedMediaItem.Builder(mediaItemBuilder.build())
-        .setEffects(Effects(emptyList(), videoEffects))
+        .setEffects(Effects(audioProcessors, videoEffects))
         .build()
     val transformer = Transformer.Builder(context).addListener(object : Transformer.Listener {
         override fun onCompleted(composition: Composition, exportResult: ExportResult) {
