@@ -42,6 +42,7 @@ import androidx.media3.common.Effect
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.Brightness
 import androidx.media3.effect.Contrast
+import androidx.media3.effect.Presentation
 import androidx.media3.effect.RgbFilter
 import androidx.media3.effect.ScaleAndRotateTransformation
 import androidx.media3.exoplayer.ExoPlayer
@@ -230,10 +231,15 @@ fun EditorScreen(
                 title = { Text(project.name, maxLines = 1) },
                 navigationIcon = { IconButton(onClick = { repo.saveProject(project); onBack() }) { Icon(Icons.Default.ArrowBack, contentDescription = "Назад") } },
                 actions = {
+                    TextButton(onClick = {
+                        val options = listOf("16:9", "9:16", "1:1", "4:3", "4:5")
+                        val next = options[(options.indexOf(project.aspectRatio).let { if (it < 0) 0 else it } + 1) % options.size]
+                        project = project.copy(aspectRatio = next); repo.saveProject(project)
+                    }) { Text(project.aspectRatio) }
                     Button(onClick = {
                         val clip = selectedClip ?: run { status = "Нет клипа для экспорта"; return@Button }
                         exporting = true; status = "Экспорт..."
-                        exportClip(context, clip, clipEffects, clipShapes) { ok, msg ->
+                        exportClip(context, clip, clipEffects, clipShapes, project.aspectRatio) { ok, msg ->
                             exporting = false; status = msg
                             Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                         }
@@ -723,7 +729,7 @@ class GainAudioProcessor(private val gain: Float) : androidx.media3.common.audio
 }
 
 @androidx.annotation.OptIn(UnstableApi::class)
-fun exportClip(context: Context, clip: Clip, effects: List<EffectItem>, shapes: List<ShapeItem>, onDone: (Boolean, String) -> Unit) {
+fun exportClip(context: Context, clip: Clip, effects: List<EffectItem>, shapes: List<ShapeItem>, aspectRatio: String, onDone: (Boolean, String) -> Unit) {
     val outFile = File(context.cacheDir, "export_${System.currentTimeMillis()}.mp4")
     val baseEffects = mutableListOf<Effect>()
     if (clip.scale != 1f || clip.rotation != 0f) {
@@ -732,11 +738,15 @@ fun exportClip(context: Context, clip: Clip, effects: List<EffectItem>, shapes: 
     val videoEffects = mutableListOf<Effect>()
     videoEffects += baseEffects
     videoEffects += effects.flatMap { it.toMedia3Effects() }
+    val ratio = when (aspectRatio) { "16:9" -> 16f/9f; "9:16" -> 9f/16f; "1:1" -> 1f; "4:3" -> 4f/3f; "4:5" -> 4f/5f; else -> 16f/9f }
+    videoEffects += Presentation.createForAspectRatio(ratio, Presentation.LAYOUT_SCALE_TO_FIT)
     if (shapes.isNotEmpty()) {
         try {
+            val outW = 1080
+            val outH = (1080f / ratio).toInt().coerceAtLeast(1)
             val overlay = object : androidx.media3.effect.BitmapOverlay() {
                 override fun getBitmap(presentationTimeUs: Long): android.graphics.Bitmap {
-                    val bmp = android.graphics.Bitmap.createBitmap(1080, 1920, android.graphics.Bitmap.Config.ARGB_8888)
+                    val bmp = android.graphics.Bitmap.createBitmap(outW, outH, android.graphics.Bitmap.Config.ARGB_8888)
                     val c = android.graphics.Canvas(bmp)
                     val p = android.graphics.Paint().apply { style = android.graphics.Paint.Style.STROKE; isAntiAlias = true }
                     val tMs = presentationTimeUs / 1000L
@@ -744,7 +754,7 @@ fun exportClip(context: Context, clip: Clip, effects: List<EffectItem>, shapes: 
                         if (s.endMs > 0 && (tMs < s.startMs || tMs > s.endMs)) return@forEach
                         p.color = s.color.toInt(); p.strokeWidth = s.stroke
                         p.style = if (s.filled && s.type != "line") android.graphics.Paint.Style.FILL else android.graphics.Paint.Style.STROKE
-                        val l = s.x * 1080f; val top = s.y * 1920f; val r = (s.x + s.w) * 1080f; val b = (s.y + s.h) * 1920f
+                        val l = s.x * outW; val top = s.y * outH; val r = (s.x + s.w) * outW; val b = (s.y + s.h) * outH
                         val bw = r-l; val bh = b-top; val cx = l + bw/2f; val cy = top + bh/2f
                         when (s.type) {
                             "circle", "oval" -> c.drawOval(l, top, r, b, p)

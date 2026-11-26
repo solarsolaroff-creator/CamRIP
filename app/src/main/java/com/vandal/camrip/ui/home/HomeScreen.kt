@@ -74,7 +74,16 @@ fun HomeScreen(
                             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text(project.name, fontWeight = FontWeight.SemiBold)
                                 Text("${project.clips.size} клипов • ${project.effects.size} эффектов • ${project.models3d.size} 3D", style = MaterialTheme.typography.bodySmall)
-                                Text(formatDate(project.updatedAt), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha=0.7f))
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                    Text(formatDate(project.updatedAt), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha=0.7f))
+                                    AssistChip(onClick = {
+                                        val options = listOf("16:9", "9:16", "1:1", "4:3", "4:5")
+                                        val next = options[(options.indexOf(project.aspectRatio).let { if (it < 0) 0 else it } + 1) % options.size]
+                                        val updated = project.copy(aspectRatio = next, updatedAt = System.currentTimeMillis())
+                                        repo.saveProject(updated)
+                                        projects = repo.loadProjects()
+                                    }, label = { Text(project.aspectRatio) })
+                                }
                             }
                         }
                     }

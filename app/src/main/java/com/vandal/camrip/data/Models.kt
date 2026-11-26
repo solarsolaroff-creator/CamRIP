@@ -8,7 +8,8 @@ data class Project(
     val clips: List<Clip> = emptyList(),
     val effects: List<EffectItem> = emptyList(),
     val models3d: List<Model3DItem> = emptyList(),
-    val shapes: List<ShapeItem> = emptyList()
+    val shapes: List<ShapeItem> = emptyList(),
+    val aspectRatio: String = "16:9"
 )
 
 data class Clip(
