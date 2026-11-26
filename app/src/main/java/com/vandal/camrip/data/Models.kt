@@ -25,7 +25,8 @@ data class Clip(
     val offsetY: Float = 0f,
     val scale: Float = 1f,
     val rotation: Float = 0f,
-    val volume: Float = 1f
+    val volume: Float = 1f,
+    val speed: Float = 1f
 )
 
 data class EffectItem(

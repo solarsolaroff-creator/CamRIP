@@ -132,6 +132,9 @@ fun EditorScreen(
     LaunchedEffect(player, selectedClip?.volume) {
         player?.volume = (selectedClip?.volume ?: 1f).coerceIn(0f, 1f)
     }
+    LaunchedEffect(player, selectedClip?.speed) {
+        player?.setPlaybackSpeed((selectedClip?.speed ?: 1f).coerceIn(0.25f, 4f))
+    }
 
     LaunchedEffect(player, isPlaying) {
         player?.playWhenReady = isPlaying
@@ -293,9 +296,14 @@ fun EditorScreen(
                         )
                     }
                     Model3DOverlay(models = clipModels)
-                    ShapeOverlay(shapes = clipShapes, playheadMs = playheadMs, onMove = { id, dx, dy, wPx, hPx ->
-                        project = project.copy(shapes = project.shapes.map { s -> if (s.id == id) s.copy(x = (s.x + dx / wPx).coerceIn(-0.2f, 1.2f), y = (s.y + dy / hPx).coerceIn(-0.2f, 1.2f)) else s })
-                    }, onMoveEnd = { repo.saveProject(project) })
+                    ShapeOverlay(shapes = clipShapes, playheadMs = playheadMs,
+                        onMove = { id, dx, dy, wPx, hPx ->
+                            project = project.copy(shapes = project.shapes.map { s -> if (s.id == id) s.copy(x = (s.x + dx / wPx).coerceIn(-0.2f, 1.2f), y = (s.y + dy / hPx).coerceIn(-0.2f, 1.2f)) else s })
+                        },
+                        onResize = { id, dx, dy, wPx, hPx ->
+                            project = project.copy(shapes = project.shapes.map { s -> if (s.id == id) s.copy(w = (s.w + dx / wPx).coerceIn(0.05f, 2f), h = (s.h + dy / hPx).coerceIn(0.05f, 2f)) else s })
+                        },
+                        onMoveEnd = { repo.saveProject(project) })
                 } else {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Добавьте видео через +", color = Color.White) }
                 }
@@ -324,6 +332,10 @@ fun EditorScreen(
                 Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("Громкость ${"%.0f".format(c.volume)}x", style = MaterialTheme.typography.labelSmall)
                     Slider(value = c.volume.coerceIn(0f, 100f), onValueChange = { v -> project = project.copy(clips = project.clips.map { if (it.id == c.id) it.copy(volume = v) else it }) }, onValueChangeFinished = { repo.saveProject(project) }, valueRange = 0f..100f, modifier = Modifier.weight(1f))
+                }
+                Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Скорость ${"%.2f".format(c.speed)}x", style = MaterialTheme.typography.labelSmall)
+                    Slider(value = c.speed.coerceIn(0.25f, 4f), onValueChange = { v -> project = project.copy(clips = project.clips.map { if (it.id == c.id) it.copy(speed = v) else it }) }, onValueChangeFinished = { repo.saveProject(project) }, valueRange = 0.25f..4f, modifier = Modifier.weight(1f))
                 }
             }
 
@@ -575,24 +587,37 @@ fun starPath(left: Float, top: Float, w: Float, h: Float, points: Int): androidx
 }
 
 @Composable
-fun ShapeOverlay(shapes: List<ShapeItem>, playheadMs: Long, onMove: (Long, Float, Float, Float, Float) -> Unit = { _, _, _, _, _ -> }, onMoveEnd: () -> Unit = {}) {
+fun ShapeOverlay(
+    shapes: List<ShapeItem>,
+    playheadMs: Long,
+    onMove: (Long, Float, Float, Float, Float) -> Unit = { _, _, _, _, _ -> },
+    onResize: (Long, Float, Float, Float, Float) -> Unit = { _, _, _, _, _ -> },
+    onMoveEnd: () -> Unit = {}
+) {
     var selectedId by remember { mutableStateOf<Long?>(null) }
+    var mode by remember { mutableStateOf("move") }
     androidx.compose.foundation.Canvas(
         Modifier.fillMaxSize().pointerInput(shapes, playheadMs) {
             detectDragGestures(
                 onDragStart = { offset ->
                     val wPx = size.width.toFloat(); val hPx = size.height.toFloat()
-                    selectedId = shapes.lastOrNull { s ->
+                    val hit = shapes.lastOrNull { s ->
                         !(s.endMs > 0 && (playheadMs < s.startMs || playheadMs > s.endMs)) &&
                         offset.x >= s.x * wPx && offset.x <= (s.x + s.w) * wPx && offset.y >= s.y * hPx && offset.y <= (s.y + s.h) * hPx
-                    }?.id
+                    }
+                    selectedId = hit?.id
+                    mode = if (hit != null) {
+                        val rx = (hit.x + hit.w) * wPx; val ry = (hit.y + hit.h) * hPx
+                        if (kotlin.math.abs(offset.x - rx) < 48f && kotlin.math.abs(offset.y - ry) < 48f) "resize" else "move"
+                    } else "move"
                 },
                 onDragEnd = { selectedId = null; onMoveEnd() },
                 onDragCancel = { selectedId = null; onMoveEnd() },
                 onDrag = { change, dragAmount ->
                     val id = selectedId ?: return@detectDragGestures
                     change.consume()
-                    onMove(id, dragAmount.x, dragAmount.y, size.width.toFloat(), size.height.toFloat())
+                    if (mode == "resize") onResize(id, dragAmount.x, dragAmount.y, size.width.toFloat(), size.height.toFloat())
+                    else onMove(id, dragAmount.x, dragAmount.y, size.width.toFloat(), size.height.toFloat())
                 }
             )
         }
@@ -632,6 +657,7 @@ fun ShapeOverlay(shapes: List<ShapeItem>, playheadMs: Long, onMove: (Long, Float
             }
             if (selectedId == s.id) {
                 drawRect(color = Color.White.copy(alpha = 0.8f), topLeft = androidx.compose.ui.geometry.Offset(left, top), size = androidx.compose.ui.geometry.Size(w, h), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f))
+                drawCircle(color = Color.White, radius = 10f, center = androidx.compose.ui.geometry.Offset(left + w, top + h))
             }
         }
     }
@@ -766,9 +792,9 @@ fun exportClip(context: Context, clip: Clip, effects: List<EffectItem>, shapes: 
                     val tMs = presentationTimeUs / 1000L
                     shapes.forEach { s ->
                         if (s.endMs > 0 && (tMs < s.startMs || tMs > s.endMs)) return@forEach
-                        p.color = s.color.toInt(); p.strokeWidth = s.stroke
+                        p.color = s.color.toInt(); p.strokeWidth = s.stroke * outW / 1080f
                         p.style = if (s.filled && s.type != "line") android.graphics.Paint.Style.FILL else android.graphics.Paint.Style.STROKE
-                        val l = s.x * outW; val top = s.y * outH; val r = (s.x + s.w) * outW; val b = (s.y + s.h) * outH
+                        val l = s.x * outW.toFloat(); val top = s.y * outH.toFloat(); val r = (s.x + s.w) * outW.toFloat(); val b = (s.y + s.h) * outH.toFloat()
                         val bw = r-l; val bh = b-top; val cx = l + bw/2f; val cy = top + bh/2f
                         when (s.type) {
                             "circle", "oval" -> c.drawOval(l, top, r, b, p)

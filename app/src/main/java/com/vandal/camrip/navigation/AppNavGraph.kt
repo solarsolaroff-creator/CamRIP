@@ -1,5 +1,11 @@
 package com.vandal.camrip.navigation
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -24,7 +30,22 @@ fun AppNavGraph() {
     val repo = remember { ProjectRepository(context) }
     val settings = remember { SettingsRepository(context) }
 
-    NavHost(navController = navController, startDestination = Routes.HOME) {
+    NavHost(
+        navController = navController,
+        startDestination = Routes.HOME,
+        enterTransition = {
+            fadeIn(animationSpec = tween(300)) + scaleIn(initialScale = 0.92f, animationSpec = tween(300, easing = FastOutSlowInEasing))
+        },
+        exitTransition = {
+            fadeOut(animationSpec = tween(300)) + scaleOut(targetScale = 1.05f, animationSpec = tween(300, easing = FastOutSlowInEasing))
+        },
+        popEnterTransition = {
+            fadeIn(animationSpec = tween(300)) + scaleIn(initialScale = 1.05f, animationSpec = tween(300, easing = FastOutSlowInEasing))
+        },
+        popExitTransition = {
+            fadeOut(animationSpec = tween(300)) + scaleOut(targetScale = 0.92f, animationSpec = tween(300, easing = FastOutSlowInEasing))
+        }
+    ) {
         composable(Routes.HOME) {
             HomeScreen(
                 repo = repo,
