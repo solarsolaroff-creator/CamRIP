@@ -9,6 +9,8 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -300,7 +302,7 @@ fun EditorScreen(
             }
 
             Column(
-                Modifier.fillMaxWidth().heightIn(min = 260.dp, max = 430.dp).background(MaterialTheme.colorScheme.surfaceVariant).padding(10.dp),
+                Modifier.fillMaxWidth().heightIn(min = 260.dp, max = 430.dp).background(MaterialTheme.colorScheme.surfaceVariant).animateContentSize().padding(10.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -425,28 +427,34 @@ fun EditorScreen(
                 }
 
                 val selEffect = if (selectedItem?.first == "effect") project.effects.firstOrNull { it.id == selectedItem?.second } else null
-                if (selEffect != null) {
-                    fun updateEffect(mut: (EffectItem) -> EffectItem) { project = project.copy(effects = project.effects.map { if (it.id == selEffect.id) mut(it) else it }); repo.saveProject(project) }
-                    HorizontalDivider()
-                    Text("Эффект: ${selEffect.type}", style = MaterialTheme.typography.titleSmall)
-                    Text("Интенсивность: ${"%.2f".format(selEffect.intensity)}")
-                    Slider(value = selEffect.intensity, onValueChange = { v -> updateEffect { it.copy(intensity = v) } }, valueRange = 0f..1f)
-                    Text("Угол Z: ${selEffect.angleZ.toInt()}°")
-                    Slider(value = selEffect.angleZ, onValueChange = { v -> updateEffect { it.copy(angleZ = v) } }, valueRange = -180f..180f)
-                    Text("Масштаб: ${"%.2f".format(selEffect.scale)}")
-                    Slider(value = selEffect.scale, onValueChange = { v -> updateEffect { it.copy(scale = v) } }, valueRange = 0.2f..3f)
+                AnimatedVisibility(visible = selEffect != null) {
+                    val e = selEffect ?: return@AnimatedVisibility
+                    fun updateEffect(mut: (EffectItem) -> EffectItem) { project = project.copy(effects = project.effects.map { if (it.id == e.id) mut(it) else it }); repo.saveProject(project) }
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        HorizontalDivider()
+                        Text("Эффект: ${e.type}", style = MaterialTheme.typography.titleSmall)
+                        Text("Интенсивность: ${"%.2f".format(e.intensity)}")
+                        Slider(value = e.intensity, onValueChange = { v -> updateEffect { it.copy(intensity = v) } }, valueRange = 0f..1f)
+                        Text("Угол Z: ${e.angleZ.toInt()}°")
+                        Slider(value = e.angleZ, onValueChange = { v -> updateEffect { it.copy(angleZ = v) } }, valueRange = -180f..180f)
+                        Text("Масштаб: ${"%.2f".format(e.scale)}")
+                        Slider(value = e.scale, onValueChange = { v -> updateEffect { it.copy(scale = v) } }, valueRange = 0.2f..3f)
+                    }
                 }
 
                 val selShape = if (selectedItem?.first == "shape") project.shapes.firstOrNull { it.id == selectedItem?.second } else null
-                if (selShape != null) {
-                    fun updateShape(mut: (ShapeItem) -> ShapeItem) { project = project.copy(shapes = project.shapes.map { if (it.id == selShape.id) mut(it) else it }); repo.saveProject(project) }
-                    HorizontalDivider()
-                    Text("Фигура: ${selShape.type}", style = MaterialTheme.typography.titleSmall)
-                    Text("X: ${"%.2f".format(selShape.x)}"); Slider(value = selShape.x, onValueChange = { v -> updateShape { it.copy(x = v) } }, valueRange = 0f..1f)
-                    Text("Y: ${"%.2f".format(selShape.y)}"); Slider(value = selShape.y, onValueChange = { v -> updateShape { it.copy(y = v) } }, valueRange = 0f..1f)
-                    Text("Ширина: ${"%.2f".format(selShape.w)}"); Slider(value = selShape.w, onValueChange = { v -> updateShape { it.copy(w = v) } }, valueRange = 0.05f..1f)
-                    Text("Высота: ${"%.2f".format(selShape.h)}"); Slider(value = selShape.h, onValueChange = { v -> updateShape { it.copy(h = v) } }, valueRange = 0.05f..1f)
-                    Row(verticalAlignment = Alignment.CenterVertically) { Text("Заливка"); Switch(checked = selShape.filled, onCheckedChange = { v -> updateShape { it.copy(filled = v) } }) }
+                AnimatedVisibility(visible = selShape != null) {
+                    val s = selShape ?: return@AnimatedVisibility
+                    fun updateShape(mut: (ShapeItem) -> ShapeItem) { project = project.copy(shapes = project.shapes.map { if (it.id == s.id) mut(it) else it }); repo.saveProject(project) }
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        HorizontalDivider()
+                        Text("Фигура: ${s.type}", style = MaterialTheme.typography.titleSmall)
+                        Text("X: ${"%.2f".format(s.x)}"); Slider(value = s.x, onValueChange = { v -> updateShape { it.copy(x = v) } }, valueRange = 0f..1f)
+                        Text("Y: ${"%.2f".format(s.y)}"); Slider(value = s.y, onValueChange = { v -> updateShape { it.copy(y = v) } }, valueRange = 0f..1f)
+                        Text("Ширина: ${"%.2f".format(s.w)}"); Slider(value = s.w, onValueChange = { v -> updateShape { it.copy(w = v) } }, valueRange = 0.05f..1f)
+                        Text("Высота: ${"%.2f".format(s.h)}"); Slider(value = s.h, onValueChange = { v -> updateShape { it.copy(h = v) } }, valueRange = 0.05f..1f)
+                        Row(verticalAlignment = Alignment.CenterVertically) { Text("Заливка"); Switch(checked = s.filled, onCheckedChange = { v -> updateShape { it.copy(filled = v) } }) }
+                    }
                 }
 
                 if (clipModels.isNotEmpty()) {
