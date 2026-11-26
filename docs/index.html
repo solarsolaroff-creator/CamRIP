@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CamRIP — видеоредактор</title>
+  <meta name="description" content="CamRIP — локальный Material 3 видеоредактор для Android. Без аккаунтов, с эффектами, фигурами, 3D и экспортом.">
+  <style>
+    :root{--bg:#0f1117;--surface:#191c24;--surface2:#232733;--text:#e8eaf2;--muted:#a8afbf;--primary:#b8c4ff;--accent:#ffb3d9;--ok:#8ef0b8;--radius:24px}
+    *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:radial-gradient(1200px 600px at 10% -10%,#2a2f52,transparent),radial-gradient(900px 500px at 100% 0%,#4a2340,transparent),var(--bg);color:var(--text);line-height:1.5}
+    .wrap{max-width:980px;margin:0 auto;padding:24px} .hero{padding:56px 0 24px} .badge{display:inline-block;padding:8px 14px;border-radius:999px;background:#ffffff12;color:var(--primary);font-size:14px;margin-bottom:16px}
+    h1{font-size:clamp(40px,8vw,72px);line-height:1.05;margin:0 0 16px;letter-spacing:-.03em} .lead{font-size:18px;color:var(--muted);max-width:700px;margin:0 0 28px}
+    .actions{display:flex;gap:12px;flex-wrap:wrap} .btn{display:inline-flex;align-items:center;justify-content:center;padding:14px 22px;border-radius:999px;text-decoration:none;font-weight:700;transition:.2s transform,.2s opacity}
+    .btn:hover{transform:translateY(-1px);opacity:.96} .primary{background:var(--primary);color:#18204a} .secondary{background:#ffffff10;color:var(--text);border:1px solid #ffffff18}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:36px 0} .card{background:linear-gradient(180deg,#ffffff10,#ffffff06);border:1px solid #ffffff12;border-radius:var(--radius);padding:20px}
+    .card h3{margin:0 0 8px;font-size:18px} .card p{margin:0;color:var(--muted);font-size:15px} .icon{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:#ffffff12;margin-bottom:14px;font-size:22px}
+    .panel{background:var(--surface);border:1px solid #ffffff10;border-radius:28px;padding:24px;margin:24px 0} .panel h2{margin:0 0 12px;font-size:28px} .steps{display:grid;gap:10px;color:var(--muted)}
+    .step{padding:14px 16px;background:var(--surface2);border-radius:16px} code{background:#ffffff10;padding:2px 7px;border-radius:8px;color:var(--text)}
+    footer{padding:32px 0 48px;color:var(--muted);font-size:14px} a{color:var(--primary)}
+    @media (max-width:600px){.hero{padding-top:32px}.btn{width:100%}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div class="badge">Android • Material 3 • Локально</div>
+      <h1>CamRIP</h1>
+      <p class="lead">Видеоредактор для Android без аккаунтов. Монтаж, эффекты, фигуры, 3D-превью, XML-импорт/экспорт проектов и экспорт видео прямо на устройство.</p>
+      <div class="actions">
+        <a class="btn primary" href="https://github.com/solarsolaroff-creator/CamRIP/releases" target="_blank" rel="noopener">Скачать APK</a>
+        <a class="btn secondary" href="https://github.com/solarsolaroff-creator/CamRIP" target="_blank" rel="noopener">GitHub проекта</a>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card"><div class="icon">🎬</div><h3>Таймлайн</h3><p>Клипы, эффекты, фигуры, 3D-объекты, зум, snap, trim и перемещение по дорожкам.</p></div>
+      <div class="card"><div class="icon">✨</div><h3>Эффекты</h3><p>Цвет, контраст, трансформации, сепия, виньетка и другие эффекты с настройкой.</p></div>
+      <div class="card"><div class="icon">🔷</div><h3>Фигуры и 3D</h3><p>Фигуры на видео, редактирование, заливка, импорт 3D-моделей и превью.</p></div>
+      <div class="card"><div class="icon">📤</div><h3>Экспорт</h3><p>Соотношение сторон, качество, громкость, сохранение в <code>Movies/CamRIP</code>.</p></div>
+    </section>
+
+    <section class="panel">
+      <h2>Как скачать</h2>
+      <div class="steps">
+        <div class="step"><strong>1.</strong> Открой страницу <a href="https://github.com/solarsolaroff-creator/CamRIP/releases" target="_blank" rel="noopener">Releases</a>.</div>
+        <div class="step"><strong>2.</strong> Скачай последний <code>.apk</code>.</div>
+        <div class="step"><strong>3.</strong> Если релизов пока нет, APK можно взять из <a href="https://github.com/solarsolaroff-creator/CamRIP/actions" target="_blank" rel="noopener">GitHub Actions</a> (артефакт сборки).</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Особенности</h2>
+      <div class="steps">
+        <div class="step">Локальные проекты, без регистрации и аккаунтов.</div>
+        <div class="step">XML-импорт/экспорт проектов: эффекты и настройки сохраняются.</div>
+        <div class="step">Настройки: тема, акцент, свой шрифт, выбор иконки приложения.</div>
+      </div>
+    </section>
+
+    <footer>
+      CamRIP • <a href="https://github.com/solarsolaroff-creator/CamRIP" target="_blank" rel="noopener">solarsolaroff-creator/CamRIP</a>
+    </footer>
+  </div>
+</body>
+</html>
