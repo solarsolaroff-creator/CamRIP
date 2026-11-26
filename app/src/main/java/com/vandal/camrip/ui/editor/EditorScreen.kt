@@ -127,7 +127,7 @@ fun EditorScreen(
     DisposableEffect(player) { onDispose { player?.release() } }
 
     LaunchedEffect(player, selectedClip?.volume) {
-        player?.volume = (selectedClip?.volume ?: 1f).coerceIn(0f, 2f)
+        player?.volume = (selectedClip?.volume ?: 1f).coerceIn(0f, 1f)
     }
 
     LaunchedEffect(player, isPlaying) {
@@ -296,8 +296,8 @@ fun EditorScreen(
                     }) { Text("Сброс") }
                 }
                 Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Громкость ${"%.1f".format(c.volume)}x", style = MaterialTheme.typography.labelSmall)
-                    Slider(value = c.volume, onValueChange = { v -> project = project.copy(clips = project.clips.map { if (it.id == c.id) it.copy(volume = v) else it }) }, onValueChangeFinished = { repo.saveProject(project) }, valueRange = 0f..2f, modifier = Modifier.weight(1f))
+                    Text("Громкость ${"%.0f".format(c.volume)}x", style = MaterialTheme.typography.labelSmall)
+                    Slider(value = c.volume.coerceIn(0f, 100f), onValueChange = { v -> project = project.copy(clips = project.clips.map { if (it.id == c.id) it.copy(volume = v) else it }) }, onValueChangeFinished = { repo.saveProject(project) }, valueRange = 0f..100f, modifier = Modifier.weight(1f))
                 }
             }
 
