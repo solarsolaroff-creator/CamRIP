@@ -265,7 +265,9 @@ fun EditorScreen(
                         )
                     }
                     Model3DOverlay(models = clipModels)
-                    ShapeOverlay(shapes = clipShapes, playheadMs = playheadMs)
+                    ShapeOverlay(shapes = clipShapes, playheadMs = playheadMs, onMove = { id, dx, dy, wPx, hPx ->
+                        project = project.copy(shapes = project.shapes.map { s -> if (s.id == id) s.copy(x = (s.x + dx / wPx).coerceIn(-0.2f, 1.2f), y = (s.y + dy / hPx).coerceIn(-0.2f, 1.2f)) else s })
+                    }, onMoveEnd = { repo.saveProject(project) })
                 } else {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Добавьте видео через +", color = Color.White) }
                 }
@@ -483,6 +485,11 @@ fun EditorScreen(
                     },
                     dismissButton = {
                         Row {
+                            if (type == "clip") TextButton(onClick = {
+                                val src = project.clips.firstOrNull { it.id == id } ?: return@TextButton
+                                val copy = src.copy(id = System.currentTimeMillis(), label = src.label + " копия")
+                                project = project.copy(clips = project.clips + copy); repo.saveProject(project); contextMenuItem = null; status = "Клип дублирован"
+                            }) { Text("Дубль") }
                             TextButton(onClick = {
                                 val newProject = when (type) {
                                     "clip" -> project.copy(clips = project.clips.filterNot { it.id == id }, effects = project.effects.filterNot { it.clipId == id }, models3d = project.models3d.filterNot { it.clipId == id }, shapes = project.shapes.filterNot { it.clipId == id })
@@ -506,8 +513,28 @@ fun EditorScreen(
 }
 
 @Composable
-fun ShapeOverlay(shapes: List<ShapeItem>, playheadMs: Long) {
-    androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+fun ShapeOverlay(shapes: List<ShapeItem>, playheadMs: Long, onMove: (Long, Float, Float, Float, Float) -> Unit = { _, _, _, _, _ -> }, onMoveEnd: () -> Unit = {}) {
+    var selectedId by remember { mutableStateOf<Long?>(null) }
+    androidx.compose.foundation.Canvas(
+        Modifier.fillMaxSize().pointerInput(shapes, playheadMs) {
+            detectDragGestures(
+                onDragStart = { offset ->
+                    val wPx = size.width.toFloat(); val hPx = size.height.toFloat()
+                    selectedId = shapes.lastOrNull { s ->
+                        !(s.endMs > 0 && (playheadMs < s.startMs || playheadMs > s.endMs)) &&
+                        offset.x >= s.x * wPx && offset.x <= (s.x + s.w) * wPx && offset.y >= s.y * hPx && offset.y <= (s.y + s.h) * hPx
+                    }?.id
+                },
+                onDragEnd = { selectedId = null; onMoveEnd() },
+                onDragCancel = { selectedId = null; onMoveEnd() },
+                onDrag = { change, dragAmount ->
+                    val id = selectedId ?: return@detectDragGestures
+                    change.consume()
+                    onMove(id, dragAmount.x, dragAmount.y, size.width.toFloat(), size.height.toFloat())
+                }
+            )
+        }
+    ) {
         shapes.forEach { s ->
             if (s.endMs > 0 && (playheadMs < s.startMs || playheadMs > s.endMs)) return@forEach
             val color = Color(s.color.toInt())
@@ -519,13 +546,14 @@ fun ShapeOverlay(shapes: List<ShapeItem>, playheadMs: Long) {
             when (s.type) {
                 "circle" -> drawOval(color = color, topLeft = androidx.compose.ui.geometry.Offset(left, top), size = androidx.compose.ui.geometry.Size(w, h), style = style)
                 "triangle" -> {
-                    val path = androidx.compose.ui.graphics.Path().apply {
-                        moveTo(left + w / 2f, top); lineTo(left + w, top + h); lineTo(left, top + h); close()
-                    }
+                    val path = androidx.compose.ui.graphics.Path().apply { moveTo(left + w / 2f, top); lineTo(left + w, top + h); lineTo(left, top + h); close() }
                     drawPath(path, color = color, style = style)
                 }
                 "line" -> drawLine(color = color, start = androidx.compose.ui.geometry.Offset(left, top + h / 2f), end = androidx.compose.ui.geometry.Offset(left + w, top + h / 2f), strokeWidth = s.stroke)
                 else -> drawRect(color = color, topLeft = androidx.compose.ui.geometry.Offset(left, top), size = androidx.compose.ui.geometry.Size(w, h), style = style)
+            }
+            if (selectedId == s.id) {
+                drawRect(color = Color.White.copy(alpha = 0.8f), topLeft = androidx.compose.ui.geometry.Offset(left, top), size = androidx.compose.ui.geometry.Size(w, h), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f))
             }
         }
     }
