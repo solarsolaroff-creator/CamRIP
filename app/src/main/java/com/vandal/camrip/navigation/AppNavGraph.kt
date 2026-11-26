@@ -20,6 +20,7 @@ import com.vandal.camrip.data.ProjectRepository
 import com.vandal.camrip.data.SettingsRepository
 import com.vandal.camrip.ui.editor.EditorScreen
 import com.vandal.camrip.ui.effects.EffectsScreen
+import com.vandal.camrip.ui.export.ExportScreen
 import com.vandal.camrip.ui.home.HomeScreen
 import com.vandal.camrip.ui.settings.SettingsScreen
 
@@ -50,12 +51,17 @@ fun AppNavGraph() {
             HomeScreen(
                 repo = repo,
                 onOpenProject = { id -> navController.navigate(Routes.editor(id)) },
-                onOpenSettings = { navController.navigate(Routes.SETTINGS) }
+                onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                onOpenExport = { navController.navigate(Routes.EXPORT) }
             )
         }
 
         composable(Routes.SETTINGS) {
             SettingsScreen(settings = settings, onBack = { navController.popBackStack() })
+        }
+
+        composable(Routes.EXPORT) {
+            ExportScreen(repo = repo, onBack = { navController.popBackStack() })
         }
 
         composable(

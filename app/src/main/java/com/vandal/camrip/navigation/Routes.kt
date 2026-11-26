@@ -3,6 +3,7 @@ package com.vandal.camrip.navigation
 object Routes {
     const val HOME = "home"
     const val SETTINGS = "settings"
+    const val EXPORT = "export"
     const val EDITOR = "editor/{projectId}"
     const val EFFECTS = "effects/{projectId}/{clipId}"
 

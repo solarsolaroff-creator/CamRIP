@@ -27,7 +27,8 @@ import java.util.Locale
 fun HomeScreen(
     repo: ProjectRepository,
     onOpenProject: (Long) -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onOpenExport: () -> Unit = {}
 ) {
     var projects by remember { mutableStateOf(repo.loadProjects()) }
     LaunchedEffect(Unit) { projects = repo.loadProjects() }
@@ -36,7 +37,10 @@ fun HomeScreen(
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Column(horizontalAlignment = Alignment.CenterHorizontally) { Text("CamRIP", fontWeight = FontWeight.Bold); Text("Material 3 видеоредактор", style = MaterialTheme.typography.labelSmall) } },
-                actions = { IconButton(onClick = onOpenSettings) { Icon(Icons.Default.Settings, contentDescription = "Настройки") } }
+                actions = {
+                    TextButton(onClick = onOpenExport) { Text("XML") }
+                    IconButton(onClick = onOpenSettings) { Icon(Icons.Default.Settings, contentDescription = "Настройки") }
+                }
             )
         },
         floatingActionButton = {
