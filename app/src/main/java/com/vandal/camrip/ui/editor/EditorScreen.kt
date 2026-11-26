@@ -47,11 +47,13 @@ import androidx.media3.effect.RgbFilter
 import androidx.media3.effect.ScaleAndRotateTransformation
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.transformer.Composition
+import androidx.media3.transformer.DefaultEncoderFactory
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.Effects
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.Transformer
+import androidx.media3.transformer.VideoEncoderSettings
 import androidx.media3.ui.PlayerView
 import com.vandal.camrip.data.Clip
 import com.vandal.camrip.data.EffectItem
@@ -231,6 +233,12 @@ fun EditorScreen(
                 title = { Text(project.name, maxLines = 1) },
                 navigationIcon = { IconButton(onClick = { repo.saveProject(project); onBack() }) { Icon(Icons.Default.ArrowBack, contentDescription = "Назад") } },
                 actions = {
+                    val qualityOptions = listOf("very_low", "low", "medium", "high", "very_high", "ultra")
+                    val qualityLabel = mapOf("very_low" to "Очень низк.", "low" to "Низк.", "medium" to "Средн.", "high" to "Высок.", "very_high" to "Очень высок.", "ultra" to "Макс.").getOrDefault(project.exportQuality, "Высок.")
+                    TextButton(onClick = {
+                        val next = qualityOptions[(qualityOptions.indexOf(project.exportQuality).let { if (it < 0) 3 else it } + 1) % qualityOptions.size]
+                        project = project.copy(exportQuality = next); repo.saveProject(project)
+                    }) { Text(qualityLabel) }
                     TextButton(onClick = {
                         val options = listOf("16:9", "9:16", "1:1", "4:3", "4:5")
                         val next = options[(options.indexOf(project.aspectRatio).let { if (it < 0) 0 else it } + 1) % options.size]
@@ -239,7 +247,7 @@ fun EditorScreen(
                     Button(onClick = {
                         val clip = selectedClip ?: run { status = "Нет клипа для экспорта"; return@Button }
                         exporting = true; status = "Экспорт..."
-                        exportClip(context, clip, clipEffects, clipShapes, project.aspectRatio) { ok, msg ->
+                        exportClip(context, clip, clipEffects, clipShapes, project.aspectRatio, project.exportQuality) { ok, msg ->
                             exporting = false; status = msg
                             Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                         }
@@ -729,7 +737,7 @@ class GainAudioProcessor(private val gain: Float) : androidx.media3.common.audio
 }
 
 @androidx.annotation.OptIn(UnstableApi::class)
-fun exportClip(context: Context, clip: Clip, effects: List<EffectItem>, shapes: List<ShapeItem>, aspectRatio: String, onDone: (Boolean, String) -> Unit) {
+fun exportClip(context: Context, clip: Clip, effects: List<EffectItem>, shapes: List<ShapeItem>, aspectRatio: String, exportQuality: String, onDone: (Boolean, String) -> Unit) {
     val outFile = File(context.cacheDir, "export_${System.currentTimeMillis()}.mp4")
     val baseEffects = mutableListOf<Effect>()
     if (clip.scale != 1f || clip.rotation != 0f) {
@@ -785,17 +793,31 @@ fun exportClip(context: Context, clip: Clip, effects: List<EffectItem>, shapes: 
     val edited = EditedMediaItem.Builder(mediaItemBuilder.build())
         .setEffects(Effects(audioProcessors, videoEffects))
         .build()
-    val transformer = Transformer.Builder(context).addListener(object : Transformer.Listener {
-        override fun onCompleted(composition: Composition, exportResult: ExportResult) {
-            val ok = saveToGallery(context, outFile)
-            outFile.delete()
-            onDone(ok, if (ok) "Сохранено в Movies/CamRIP" else "Не удалось сохранить в галерею")
-        }
-        override fun onError(composition: Composition, exportResult: ExportResult, exportException: ExportException) {
-            outFile.delete()
-            onDone(false, "Ошибка экспорта: ${exportException.errorCodeName}: ${exportException.message ?: ""}")
-        }
-    }).build()
+    val bitrate = when (exportQuality) {
+        "very_low" -> 400_000
+        "low" -> 1_000_000
+        "medium" -> 2_500_000
+        "high" -> 5_000_000
+        "very_high" -> 10_000_000
+        "ultra" -> 20_000_000
+        else -> 5_000_000
+    }
+    val encoderFactory = DefaultEncoderFactory.Builder(context)
+        .setRequestedVideoEncoderSettings(VideoEncoderSettings.Builder().setBitrate(bitrate).build())
+        .build()
+    val transformer = Transformer.Builder(context)
+        .setEncoderFactory(encoderFactory)
+        .addListener(object : Transformer.Listener {
+            override fun onCompleted(composition: Composition, exportResult: ExportResult) {
+                val ok = saveToGallery(context, outFile)
+                outFile.delete()
+                onDone(ok, if (ok) "Сохранено в Movies/CamRIP" else "Не удалось сохранить в галерею")
+            }
+            override fun onError(composition: Composition, exportResult: ExportResult, exportException: ExportException) {
+                outFile.delete()
+                onDone(false, "Ошибка экспорта: ${exportException.errorCodeName}: ${exportException.message ?: ""}")
+            }
+        }).build()
     transformer.start(edited, outFile.absolutePath)
 }
 

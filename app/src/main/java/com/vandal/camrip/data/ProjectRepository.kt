@@ -39,7 +39,7 @@ class ProjectRepository(private val context: Context) {
 }
 
 private fun Project.toJson(): JSONObject = JSONObject().apply {
-    put("id", id); put("name", name); put("createdAt", createdAt); put("updatedAt", updatedAt); put("aspectRatio", aspectRatio)
+    put("id", id); put("name", name); put("createdAt", createdAt); put("updatedAt", updatedAt); put("aspectRatio", aspectRatio); put("exportQuality", exportQuality)
     put("clips", JSONArray().apply { clips.forEach { c ->
         put(JSONObject().apply {
             put("id", c.id); put("uri", c.uri); put("startMs", c.startMs); put("endMs", c.endMs); put("durationMs", c.durationMs); put("label", c.label)
@@ -78,7 +78,7 @@ private fun JSONObject.toProject(): Project {
     val modelsArr = optJSONArray("models3d") ?: JSONArray()
     val shapesArr = optJSONArray("shapes") ?: JSONArray()
     return Project(
-        id = optLong("id"), name = optString("name"), createdAt = optLong("createdAt"), updatedAt = optLong("updatedAt"), aspectRatio = optString("aspectRatio", "16:9"),
+        id = optLong("id"), name = optString("name"), createdAt = optLong("createdAt"), updatedAt = optLong("updatedAt"), aspectRatio = optString("aspectRatio", "16:9"), exportQuality = optString("exportQuality", "high"),
         clips = (0 until clipsArr.length()).map { i -> clipsArr.getJSONObject(i).let { c ->
             Clip(c.optLong("id"), c.optString("uri"), c.optLong("startMs"), c.optLong("endMs"), c.optLong("durationMs"), c.optString("label", "Клип"), c.optString("groupId").ifBlank { null }, c.optDouble("offsetX", 0.0).toFloat(), c.optDouble("offsetY", 0.0).toFloat(), c.optDouble("scale", 1.0).toFloat(), c.optDouble("rotation", 0.0).toFloat(), c.optDouble("volume", 1.0).toFloat())
         } },
