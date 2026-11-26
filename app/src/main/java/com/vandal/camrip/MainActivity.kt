@@ -33,6 +33,7 @@ class MainActivity : ComponentActivity() {
             val settings = remember { SettingsRepository(context) }
             val accentName by settings.accent.collectAsState(initial = "pink")
             val themeName by settings.theme.collectAsState(initial = "dark")
+            val fontPath by settings.fontPath.collectAsState(initial = "")
             val dynamic = accentName == "dynamic" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
             val accent = when (accentName) {
                 "green" -> DesignTokens.Secondary
@@ -45,7 +46,33 @@ class MainActivity : ComponentActivity() {
                 background = DesignTokens.BackgroundDark, surface = DesignTokens.SurfaceDark, surfaceVariant = DesignTokens.SurfaceVariantDark, onSurface = DesignTokens.OnSurfaceDark
             )
             val light = if (dynamic) dynamicLightColorScheme(context) else lightColorScheme(primary = accent, secondary = Color(0xFF2D8A5F), background = Color(0xFFF7F7FC), surface = Color(0xFFFFFFFF), onSurface = Color(0xFF111122))
-            MaterialTheme(colorScheme = if (themeName == "light") light else dark, shapes = DesignTokens.Shapes, typography = Typography()) {
+            val typography = remember(fontPath) {
+                val file = java.io.File(fontPath)
+                if (fontPath.isNotBlank() && file.exists()) {
+                    try {
+                        val tf = android.graphics.Typeface.createFromFile(file)
+                        val ff = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Typeface(tf))
+                        Typography(
+                            displayLarge = Typography().displayLarge.copy(fontFamily = ff),
+                            displayMedium = Typography().displayMedium.copy(fontFamily = ff),
+                            displaySmall = Typography().displaySmall.copy(fontFamily = ff),
+                            headlineLarge = Typography().headlineLarge.copy(fontFamily = ff),
+                            headlineMedium = Typography().headlineMedium.copy(fontFamily = ff),
+                            headlineSmall = Typography().headlineSmall.copy(fontFamily = ff),
+                            titleLarge = Typography().titleLarge.copy(fontFamily = ff),
+                            titleMedium = Typography().titleMedium.copy(fontFamily = ff),
+                            titleSmall = Typography().titleSmall.copy(fontFamily = ff),
+                            bodyLarge = Typography().bodyLarge.copy(fontFamily = ff),
+                            bodyMedium = Typography().bodyMedium.copy(fontFamily = ff),
+                            bodySmall = Typography().bodySmall.copy(fontFamily = ff),
+                            labelLarge = Typography().labelLarge.copy(fontFamily = ff),
+                            labelMedium = Typography().labelMedium.copy(fontFamily = ff),
+                            labelSmall = Typography().labelSmall.copy(fontFamily = ff),
+                        )
+                    } catch (_: Exception) { Typography() }
+                } else Typography()
+            }
+            MaterialTheme(colorScheme = if (themeName == "light") light else dark, shapes = DesignTokens.Shapes, typography = typography) {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     AppNavGraph()
                 }

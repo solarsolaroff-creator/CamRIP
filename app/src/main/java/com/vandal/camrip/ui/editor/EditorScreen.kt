@@ -681,6 +681,12 @@ fun EffectItem.toMedia3Effects(): List<Effect> = when (type) {
     "punch" -> listOf(Contrast((intensity * 1.0f).coerceIn(-1f, 1f)), Brightness((intensity * 0.15f).coerceIn(-1f, 1f)))
     "glitch" -> listOf(RgbFilter.createGrayscaleFilter(), Contrast((intensity * 0.9f).coerceIn(-1f, 1f)), Brightness((intensity * 0.1f).coerceIn(-1f, 1f)))
     "chromatic" -> listOf(Contrast((intensity * 0.5f).coerceIn(-1f, 1f)), Brightness((intensity * 0.08f).coerceIn(-1f, 1f)))
+    "sepia" -> listOf(RgbFilter.createGrayscaleFilter(), Brightness((0.08f * intensity).coerceIn(-1f,1f)), Contrast((0.12f * intensity).coerceIn(-1f,1f)))
+    "invert" -> listOf(Contrast((-0.6f * intensity).coerceIn(-1f,1f)), Brightness((0.1f * intensity).coerceIn(-1f,1f)))
+    "warm" -> listOf(Brightness((0.05f * intensity).coerceIn(-1f,1f)), Contrast((0.08f * intensity).coerceIn(-1f,1f)))
+    "cool" -> listOf(Brightness((-0.02f * intensity).coerceIn(-1f,1f)), Contrast((0.1f * intensity).coerceIn(-1f,1f)))
+    "vignette" -> listOf(Brightness((-0.15f * intensity).coerceIn(-1f, 1f)), Contrast((0.2f * intensity).coerceIn(-1f, 1f)))
+    "saturate" -> listOf(Contrast((0.25f * intensity).coerceIn(-1f, 1f)), Brightness((0.02f * intensity).coerceIn(-1f, 1f)))
     "rotate3d", "perspective", "cube", "parallax", "flip", "tilt" ->
         listOf(ScaleAndRotateTransformation.Builder().setRotationDegrees(angleZ).build())
     "zoom", "zoom3d" -> listOf(ScaleAndRotateTransformation.Builder().setScale(scale.coerceAtLeast(0.1f), scale.coerceAtLeast(0.1f)).build())
