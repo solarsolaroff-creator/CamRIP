@@ -477,7 +477,10 @@ fun EditorScreen(
                     fun updateEffect(mut: (EffectItem) -> EffectItem) { project = project.copy(effects = project.effects.map { if (it.id == e.id) mut(it) else it }); repo.saveProject(project) }
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         HorizontalDivider()
-                        Text("Эффект: ${e.type}", style = MaterialTheme.typography.titleSmall)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text("Эффект: ${e.type}", style = MaterialTheme.typography.titleSmall)
+                            TextButton(onClick = { project = project.copy(effects = project.effects.filterNot { it.id == e.id }); if (selectedItem == ("effect" to e.id)) selectedItem = null; repo.saveProject(project); status = "Эффект удалён" }) { Text("Удалить") }
+                        }
                         Text("Интенсивность: ${"%.2f".format(e.intensity)}")
                         Slider(value = e.intensity, onValueChange = { v -> updateEffect { it.copy(intensity = v) } }, valueRange = 0f..1f)
                         Text("Угол Z: ${e.angleZ.toInt()}°")
@@ -493,7 +496,10 @@ fun EditorScreen(
                     fun updateShape(mut: (ShapeItem) -> ShapeItem) { project = project.copy(shapes = project.shapes.map { if (it.id == s.id) mut(it) else it }); repo.saveProject(project) }
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         HorizontalDivider()
-                        Text("Фигура: ${s.type}", style = MaterialTheme.typography.titleSmall)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text("Фигура: ${s.type}", style = MaterialTheme.typography.titleSmall)
+                            TextButton(onClick = { project = project.copy(shapes = project.shapes.filterNot { it.id == s.id }); if (selectedItem == ("shape" to s.id)) selectedItem = null; repo.saveProject(project); status = "Фигура удалена" }) { Text("Удалить") }
+                        }
                         Text("X: ${"%.2f".format(s.x)}"); Slider(value = s.x, onValueChange = { v -> updateShape { it.copy(x = v) } }, valueRange = 0f..1f)
                         Text("Y: ${"%.2f".format(s.y)}"); Slider(value = s.y, onValueChange = { v -> updateShape { it.copy(y = v) } }, valueRange = 0f..1f)
                         Text("Ширина: ${"%.2f".format(s.w)}"); Slider(value = s.w, onValueChange = { v -> updateShape { it.copy(w = v) } }, valueRange = 0.05f..1f)
@@ -506,7 +512,10 @@ fun EditorScreen(
                     val sel3d = clipModels.firstOrNull { it.id == selectedModel3dId } ?: clipModels.first()
                     fun updateModel(mut: (Model3DItem) -> Model3DItem) { project = project.copy(models3d = project.models3d.map { if (it.id == sel3d.id) mut(it) else it }); repo.saveProject(project) }
                     HorizontalDivider()
-                    Text("3D: ${sel3d.name}", style = MaterialTheme.typography.titleSmall)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("3D: ${sel3d.name}", style = MaterialTheme.typography.titleSmall)
+                        TextButton(onClick = { project = project.copy(models3d = project.models3d.filterNot { it.id == sel3d.id }); if (selectedModel3dId == sel3d.id) selectedModel3dId = project.models3d.firstOrNull { it.id != sel3d.id }?.id; repo.saveProject(project); status = "3D удалён" }) { Text("Удалить") }
+                    }
                     Text("Масштаб: ${"%.2f".format(sel3d.scale)}")
                     Slider(value = sel3d.scale, onValueChange = { v -> updateModel { it.copy(scale = v) } }, valueRange = 0.2f..5f)
                     Text("Поворот Y: ${sel3d.rotY.toInt()}°")

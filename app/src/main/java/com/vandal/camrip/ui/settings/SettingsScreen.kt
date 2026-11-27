@@ -35,7 +35,7 @@ fun SettingsScreen(settings: SettingsRepository, onBack: () -> Unit) {
     val asciiBg by settings.asciiBg.collectAsState(initial = "off")
     var msg by remember { mutableStateOf("") }
     val accents = listOf("dynamic" to Color(0xFF6750A4), "pink" to Color(0xFFFF4FD8), "green" to Color(0xFF7CFFB2), "blue" to Color(0xFF7AA2FF), "orange" to Color(0xFFFFA94F))
-    val iconOptions = listOf("default" to "Стандарт", "cam" to "Камера", "film" to "Плёнка", "neon" to "Неон")
+    val iconOptions = listOf("default" to "Стандарт", "cam" to "Камера", "film" to "Плёнка", "neon" to "Неон", "xp" to "XP")
 
     val fontPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -58,6 +58,7 @@ fun SettingsScreen(settings: SettingsRepository, onBack: () -> Unit) {
             "cam" to "$pkg.CamIconAlias",
             "film" to "$pkg.FilmIconAlias",
             "neon" to "$pkg.NeonIconAlias",
+            "xp" to "$pkg.XpIconAlias",
         )
         all.forEach { (k, cls) ->
             val state = if (k == key) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED
