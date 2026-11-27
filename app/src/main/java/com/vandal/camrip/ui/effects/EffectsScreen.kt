@@ -20,7 +20,7 @@ fun EffectsScreen(
     onApply: (EffectItem) -> Unit,
     onBack: () -> Unit
 ) {
-    val categories = listOf("3D-трансформации", "Искажения", "Свет и цвет", "Камера/шейки")
+    val categories = listOf("3D-трансформации", "Свет и цвет")
     var selectedCategory by remember { mutableStateOf(categories.first()) }
 
     val effects = remember {
@@ -28,19 +28,13 @@ fun EffectsScreen(
             EffectDef("rotate3d", "3D-поворот", "3D-трансформации", true),
             EffectDef("perspective", "Перспектива", "3D-трансформации", true),
             EffectDef("zoom3d", "3D Зум", "3D-трансформации", true),
-            EffectDef("glitch", "Глитч", "Искажения"),
-            EffectDef("chromatic", "Хром. аберрация", "Искажения"),
-            EffectDef("wave", "Волна", "Искажения"),
-            EffectDef("fisheye", "Рыбий глаз", "Искажения"),
-            EffectDef("gaussian_blur", "Блюр", "Искажения"),
+            EffectDef("shake", "Тряска камеры", "3D-трансформации"),
+            EffectDef("zoom", "Зум-пульс", "3D-трансформации"),
+            EffectDef("tilt", "Наклон камеры", "3D-трансформации", true),
+            EffectDef("gaussian_blur", "Блюр", "Свет и цвет"),
             EffectDef("brightness", "Яркость", "Свет и цвет"),
             EffectDef("contrast", "Контраст", "Свет и цвет"),
             EffectDef("grayscale", "Ч/Б", "Свет и цвет"),
-            EffectDef("sepia", "Сепия", "Свет и цвет"),
-            EffectDef("warm", "Тёплый", "Свет и цвет"),
-            EffectDef("cool", "Холодный", "Свет и цвет"),
-            EffectDef("vignette", "Виньетка", "Свет и цвет"),
-            EffectDef("saturate", "Насыщенность", "Свет и цвет"),
             EffectDef("hsl_hue", "Оттенок HSL", "Свет и цвет"),
             EffectDef("hsl_saturation", "Saturation HSL", "Свет и цвет"),
             EffectDef("hsl_lightness", "Яркость HSL", "Свет и цвет"),
@@ -48,9 +42,6 @@ fun EffectsScreen(
             EffectDef("rgb_cool", "Холодный RGB", "Свет и цвет"),
             EffectDef("fade", "Затемнение", "Свет и цвет"),
             EffectDef("punch", "Панч", "Свет и цвет"),
-            EffectDef("shake", "Тряска камеры", "Камера/шейки"),
-            EffectDef("zoom", "Зум-пульс", "Камера/шейки"),
-            EffectDef("tilt", "Наклон камеры", "Камера/шейки"),
         )
     }
 

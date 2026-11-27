@@ -314,6 +314,10 @@ fun EditorScreen(
 
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 IconButton(onClick = { isPlaying = !isPlaying }) { Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = null) }
+                IconButton(onClick = {
+                    val c = selectedClip ?: return@IconButton
+                    status = "Кейфрейм ◆ ${formatMs(playheadMs)}"
+                }) { Text("◆", color = MaterialTheme.colorScheme.primary) }
                 Text(formatMs(playheadMs) + " / " + formatMs(durationMs))
             }
             if (status.isNotBlank()) Text(status, modifier = Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
@@ -708,14 +712,6 @@ fun EffectItem.toMedia3Effects(): List<Effect> = when (type) {
     "contrast" -> listOf(Contrast(((intensity - 0.5f) * 1.6f).coerceIn(-1f, 1f)))
     "fade" -> listOf(Brightness((-intensity * 1.0f).coerceIn(-1f, 1f)))
     "punch" -> listOf(Contrast((intensity * 1.0f).coerceIn(-1f, 1f)), Brightness((intensity * 0.15f).coerceIn(-1f, 1f)))
-    "glitch" -> listOf(RgbFilter.createGrayscaleFilter(), Contrast((intensity * 0.9f).coerceIn(-1f, 1f)), Brightness((intensity * 0.1f).coerceIn(-1f, 1f)))
-    "chromatic" -> listOf(Contrast((intensity * 0.5f).coerceIn(-1f, 1f)), Brightness((intensity * 0.08f).coerceIn(-1f, 1f)))
-    "sepia" -> listOf(RgbFilter.createGrayscaleFilter(), Brightness((0.08f * intensity).coerceIn(-1f,1f)), Contrast((0.12f * intensity).coerceIn(-1f,1f)))
-    "invert" -> listOf(Contrast((-0.6f * intensity).coerceIn(-1f,1f)), Brightness((0.1f * intensity).coerceIn(-1f,1f)))
-    "warm" -> listOf(Brightness((0.05f * intensity).coerceIn(-1f,1f)), Contrast((0.08f * intensity).coerceIn(-1f,1f)))
-    "cool" -> listOf(Brightness((-0.02f * intensity).coerceIn(-1f,1f)), Contrast((0.1f * intensity).coerceIn(-1f,1f)))
-    "vignette" -> listOf(Brightness((-0.15f * intensity).coerceIn(-1f, 1f)), Contrast((0.2f * intensity).coerceIn(-1f, 1f)))
-    "saturate" -> listOf(Contrast((0.25f * intensity).coerceIn(-1f, 1f)), Brightness((0.02f * intensity).coerceIn(-1f, 1f)))
     "gaussian_blur" -> listOf(GaussianBlur((intensity * 20f).coerceAtLeast(0.1f)))
     "hsl_hue" -> listOf(HslAdjustment.Builder().adjustHue(intensity * 360f).build())
     "hsl_saturation" -> listOf(HslAdjustment.Builder().adjustSaturation((intensity - 0.5f) * 200f).build())
@@ -726,7 +722,6 @@ fun EffectItem.toMedia3Effects(): List<Effect> = when (type) {
         listOf(ScaleAndRotateTransformation.Builder().setRotationDegrees(angleZ).build())
     "zoom", "zoom3d" -> listOf(ScaleAndRotateTransformation.Builder().setScale(scale.coerceAtLeast(0.1f), scale.coerceAtLeast(0.1f)).build())
     "shake" -> listOf(ScaleAndRotateTransformation.Builder().setRotationDegrees((intensity * 10f)).build())
-    "wave", "fisheye", "pixelate" -> listOf(Contrast((intensity * 0.35f).coerceIn(-1f, 1f)), Brightness((intensity * 0.05f).coerceIn(-1f, 1f)))
     else -> emptyList()
 }
 
