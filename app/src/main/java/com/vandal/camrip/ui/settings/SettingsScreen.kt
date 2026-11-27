@@ -33,6 +33,7 @@ fun SettingsScreen(settings: SettingsRepository, onBack: () -> Unit) {
     val appIcon by settings.appIcon.collectAsState(initial = "default")
     val uiStyle by settings.uiStyle.collectAsState(initial = "material")
     val asciiBg by settings.asciiBg.collectAsState(initial = "off")
+    val asciiBgUrl by settings.asciiBgUrl.collectAsState(initial = "")
     var msg by remember { mutableStateOf("") }
     val accents = listOf("dynamic" to Color(0xFF6750A4), "pink" to Color(0xFFFF4FD8), "green" to Color(0xFF7CFFB2), "blue" to Color(0xFF7AA2FF), "orange" to Color(0xFFFFA94F))
     val iconOptions = listOf("default" to "Стандарт", "cam" to "Камера", "film" to "Плёнка", "neon" to "Неон", "xp" to "XP")
@@ -89,9 +90,15 @@ fun SettingsScreen(settings: SettingsRepository, onBack: () -> Unit) {
                     FilterChip(selected = uiStyle == key, onClick = { scope.launch { settings.setUiStyle(key) } }, label = { Text(label) })
                 }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) { Text("ASCII фон на главном экране"); Text("Анимированный калейдоскоп, по умолчанию выключен", style = MaterialTheme.typography.bodySmall) }
-                Switch(checked = asciiBg == "on", onCheckedChange = { v -> scope.launch { settings.setAsciiBg(if (v) "on" else "off") } })
+            Text("ASCII фон на главном экране", style = MaterialTheme.typography.titleSmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("off" to "Выкл", "builtin" to "Встроенный", "url" to "Ссылка").forEach { (k,l) ->
+                    FilterChip(selected = asciiBg == k, onClick = { scope.launch { settings.setAsciiBg(k) } }, label = { Text(l) })
+                }
+            }
+            if (asciiBg == "url") {
+                OutlinedTextField(value = asciiBgUrl, onValueChange = { scope.launch { settings.setAsciiBgUrl(it) } }, label = { Text("URL анимации") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                Text("Вставь ссылку на страницу анимации (например asciiart.eu)", style = MaterialTheme.typography.bodySmall)
             }
             Text("Цвет акцента / Material You")
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {

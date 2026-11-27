@@ -14,8 +14,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.vandal.camrip.data.Project
 import com.vandal.camrip.data.ProjectRepository
 import com.vandal.camrip.data.SettingsRepository
@@ -35,6 +37,7 @@ fun HomeScreen(
     var projects by remember { mutableStateOf(repo.loadProjects()) }
     LaunchedEffect(Unit) { projects = repo.loadProjects() }
     val asciiBg by (settings?.asciiBg ?: kotlinx.coroutines.flow.flowOf("off")).collectAsState(initial = "off")
+    val asciiBgUrl by (settings?.asciiBgUrl ?: kotlinx.coroutines.flow.flowOf("")).collectAsState(initial = "")
 
     Scaffold(
         topBar = {
@@ -60,8 +63,9 @@ fun HomeScreen(
         }
     ) { pad ->
         Box(Modifier.fillMaxSize()) {
-            if (asciiBg == "on") {
-                AsciiKaleidoscopeBackground(Modifier.fillMaxSize())
+            when (asciiBg) {
+                "builtin", "on" -> AsciiKaleidoscopeBackground(Modifier.fillMaxSize())
+                "url" -> if (asciiBgUrl.isNotBlank()) AndroidView(factory = { ctx -> android.webkit.WebView(ctx).apply { settings.javaScriptEnabled = true; settings.domStorageEnabled = true; setBackgroundColor(android.graphics.Color.TRANSPARENT); isClickable = false; isFocusable = false; loadUrl(asciiBgUrl) } }, update = { if (it.url != asciiBgUrl) it.loadUrl(asciiBgUrl) }, modifier = Modifier.fillMaxSize())
             }
         if (projects.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.Center) {
