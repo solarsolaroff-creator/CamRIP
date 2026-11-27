@@ -5,14 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>CamRIP — скачать</title>
   <style>
-    :root{--bg:#0f1117;--surface:#191c24;--surface2:#232733;--text:#e8eaf2;--muted:#a8afbf;--primary:#b8c4ff;--radius:24px}
-    *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:radial-gradient(1200px 600px at 10% -10%,#2a2f52,transparent),var(--bg);color:var(--text);line-height:1.5}
-    .wrap{max-width:760px;margin:0 auto;padding:24px} .hero{padding:40px 0 16px} .badge{display:inline-block;padding:8px 14px;border-radius:999px;background:#ffffff12;color:var(--primary);font-size:14px;margin-bottom:16px}
+    :root{--bg:#141218;--surface:#211f26;--surface2:#2b2930;--text:#e6e0e9;--muted:#cac4d0;--primary:#d0bcff;--on-primary:#381e72;--error:#f2b8b5;--errc:#601410;--radius:24px}
+    *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:radial-gradient(900px 500px at 0% 0%,#3b2d5c55,transparent),var(--bg);color:var(--text);line-height:1.5}
+    .wrap{max-width:760px;margin:0 auto;padding:24px} .hero{padding:36px 0 8px} .badge{display:inline-block;padding:8px 14px;border-radius:999px;background:#d0bcff22;color:var(--primary);font-size:14px;margin-bottom:16px}
     h1{font-size:clamp(40px,8vw,64px);line-height:1.05;margin:0 0 12px} .lead{color:var(--muted);margin:0 0 24px;font-size:18px}
-    .panel{background:var(--surface);border:1px solid #ffffff10;border-radius:28px;padding:24px;margin:20px 0}
+    .panel{background:var(--surface);border:1px solid #ffffff14;border-radius:28px;padding:24px;margin:20px 0;overflow:hidden;position:relative}
     .btn{display:inline-flex;align-items:center;justify-content:center;padding:14px 22px;border-radius:999px;text-decoration:none;font-weight:700;border:0;cursor:pointer;font-size:16px}
-    .primary{background:var(--primary);color:#18204a} .primary[aria-disabled="true"]{opacity:.45;cursor:not-allowed;pointer-events:none}
-    .muted{color:var(--muted);font-size:14px} code{background:#ffffff10;padding:2px 7px;border-radius:8px}
+    .primary{background:var(--primary);color:var(--on-primary)} .primary[aria-disabled="true"]{opacity:.45;cursor:not-allowed;pointer-events:none}
+    .muted{color:var(--muted);font-size:14px} code{background:#ffffff12;padding:2px 7px;border-radius:8px}
+    /* M3 linear loader */
+    .loader-wrap{margin:14px 0 6px}
+    .track{height:12px;background:#49454f;border-radius:999px;overflow:hidden;position:relative}
+    .bar{position:absolute;height:100%;width:40%;left:-40%;background:linear-gradient(90deg,#d0bcff,#f6ddff);border-radius:999px;animation:indet 1.6s cubic-bezier(.4,0,.2,1) infinite}
+    .bar2{width:25%;animation-delay:.45s;opacity:.75}
+    @keyframes indet{0%{left:-40%;width:35%}50%{left:35%;width:45%}100%{left:110%;width:30%}}
+    .shapes{display:flex;gap:10px;margin-top:12px;align-items:center}
+    .shape{width:18px;height:18px;background:var(--primary);opacity:.85;animation:float 1.8s ease-in-out infinite}
+    .s1{border-radius:6px;transform:rotate(12deg)} .s2{border-radius:50%;background:#f6ddff;animation-delay:.2s} .s3{clip-path:polygon(50% 0,100% 100%,0 100%);border-radius:2px;animation-delay:.4s} .s4{border-radius:4px;transform:rotate(45deg);background:#ccc2dc;animation-delay:.6s}
+    @keyframes float{0%,100%{transform:translateY(0) rotate(var(--r,0deg)) scale(1)}50%{transform:translateY(-4px) rotate(var(--r,0deg)) scale(1.08)}}
+    .s1{--r:12deg}.s4{--r:45deg}
+    .status{display:flex;align-items:center;gap:10px;margin-top:10px;color:var(--muted);font-size:14px}
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--primary);animation:pulse 1s infinite}
+    @keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
+    .error{display:none;background:#3b090e;border:1px solid #f2b8b555;color:#ffdad6;padding:14px 16px;border-radius:16px;margin-top:14px}
+    .error.show{display:block}
+    .hidden{display:none !important}
   </style>
   <!-- Veriq: замени YOUR_VERIQ_BASE_URL на реальный базовый URL капчи -->
   <link rel="stylesheet" href="https://YOUR_VERIQ_BASE_URL/static/widget.css">
@@ -25,7 +42,21 @@
       <p class="lead">Локальный видеоредактор для Android. Перед скачиванием пройди проверку.</p>
     </section>
 
-    <section class="panel">
+    <section class="panel" id="loadPanel">
+      <h2 style="margin-top:0">Подключение</h2>
+      <div id="loaderBlock">
+        <div class="loader-wrap" aria-label="Загрузка">
+          <div class="track"><div class="bar"></div><div class="bar bar2"></div></div>
+        </div>
+        <div class="shapes">
+          <div class="shape s1"></div><div class="shape s2"></div><div class="shape s3"></div><div class="shape s4"></div>
+        </div>
+        <div class="status"><div class="dot"></div><span id="statusText">Проверка соединения...</span></div>
+      </div>
+      <div id="timeoutError" class="error"><strong>Timeout</strong><br>Не удалось загрузиться. Проверь интернет и обнови страницу.</div>
+    </section>
+
+    <section class="panel" id="captchaPanel">
       <h2 style="margin-top:0">Проверка</h2>
       <div class="mycaptcha-widget" data-sitekey="pk_64LZV7SaqIeu_emlDtD4hg" data-base="https://YOUR_VERIQ_BASE_URL"></div>
       <p class="muted" style="margin:14px 0 0">После проверки кнопка скачивания станет активной.</p>
@@ -41,6 +72,11 @@
   <script src="https://YOUR_VERIQ_BASE_URL/widget.js"></script>
   <script>
     const btn = document.getElementById('downloadBtn');
+    const statusText = document.getElementById('statusText');
+    const loaderBlock = document.getElementById('loaderBlock');
+    const timeoutError = document.getElementById('timeoutError');
+    let ready = false;
+
     function checkToken() {
       const token = document.querySelector('input[name="mycaptcha_token"]');
       const ok = !!(token && token.value && token.value.trim().length > 0);
@@ -50,6 +86,31 @@
     document.addEventListener('change', checkToken);
     document.addEventListener('input', checkToken);
     btn.addEventListener('click', (e) => { if (btn.getAttribute('aria-disabled') === 'true') e.preventDefault(); });
+
+    function markReady() {
+      if (ready) return;
+      ready = true;
+      statusText.textContent = 'Соединение в порядке';
+      setTimeout(() => { loaderBlock.classList.add('hidden'); }, 600);
+    }
+    function showTimeout() {
+      if (ready) return;
+      loaderBlock.classList.add('hidden');
+      timeoutError.classList.add('show');
+    }
+
+    // If offline, show loader briefly then timeout
+    if (!navigator.onLine) {
+      statusText.textContent = 'Нет интернета...';
+      setTimeout(showTimeout, 7000);
+      window.addEventListener('online', () => { timeoutError.classList.remove('show'); loaderBlock.classList.remove('hidden'); statusText.textContent = 'Соединение восстановлено'; markReady(); });
+    } else {
+      statusText.textContent = 'Загрузка...';
+      // Consider ready when page is loaded; if captcha script fails to load, timeout
+      window.addEventListener('load', () => { setTimeout(markReady, 800); });
+      setTimeout(() => { if (!ready) showTimeout(); }, 12000);
+    }
+    window.addEventListener('offline', () => { if (!ready) { statusText.textContent = 'Нет интернета...'; } });
   </script>
 </body>
 </html>
