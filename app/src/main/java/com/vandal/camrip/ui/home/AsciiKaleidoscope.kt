@@ -30,7 +30,7 @@ fun AsciiKaleidoscopeBackground(modifier: Modifier = Modifier) {
             textSize = cellH * 0.9f
             typeface = android.graphics.Typeface.MONOSPACE
             isAntiAlias = true
-            alpha = 90
+            alpha = 45
         }
         val t = time
         val angle = t * 0.35f
