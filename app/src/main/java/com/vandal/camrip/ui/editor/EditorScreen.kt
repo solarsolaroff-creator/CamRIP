@@ -132,11 +132,10 @@ fun EditorScreen(
     }
     DisposableEffect(player) { onDispose { player?.release() } }
 
-    LaunchedEffect(player, selectedClip?.volume) {
-        player?.volume = (selectedClip?.volume ?: 1f).coerceIn(0f, 1f)
-    }
-    LaunchedEffect(player, selectedClip?.speed) {
-        player?.setPlaybackSpeed((selectedClip?.speed ?: 1f).coerceIn(0.25f, 4f))
+    LaunchedEffect(player, selectedClip?.id, playheadMs) {
+        val c = selectedClip?.atTime(playheadMs)
+        player?.volume = (c?.volume ?: 1f).coerceIn(0f, 1f)
+        player?.setPlaybackSpeed((c?.speed ?: 1f).coerceIn(0.25f, 4f))
     }
 
     LaunchedEffect(player, isPlaying) {
@@ -266,7 +265,7 @@ fun EditorScreen(
         Column(Modifier.fillMaxSize().padding(pad)) {
             Box(Modifier.fillMaxWidth().weight(1f).background(Color.Black)) {
                 if (player != null) {
-                    val clipTransform = selectedClip
+                    val clipTransform = selectedClip?.atTime(playheadMs)
                     val agslMod = rememberAgslPreviewModifier(clipEffects.map { it.type }, clipEffects.firstOrNull()?.intensity ?: 0.5f)
                     Box(
                         Modifier
@@ -315,8 +314,20 @@ fun EditorScreen(
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 IconButton(onClick = { isPlaying = !isPlaying }) { Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = null) }
                 IconButton(onClick = {
-                    val c = selectedClip ?: return@IconButton
-                    status = "Кейфрейм ◆ ${formatMs(playheadMs)}"
+                    val sel = selectedItem
+                    if (sel?.first == "shape") {
+                        val s = project.shapes.firstOrNull { it.id == sel.second } ?: return@IconButton
+                        val cur = s.atTime(playheadMs)
+                        val kf = ShapeKeyframe(playheadMs, cur.x, cur.y, cur.w, cur.h)
+                        project = project.copy(shapes = project.shapes.map { sh -> if (sh.id == s.id) sh.copy(keyframes = (sh.keyframes.filterNot { it.timeMs == playheadMs } + kf).sortedBy { it.timeMs }) else sh })
+                        repo.saveProject(project); status = "Кейфрейм фигуры ◆ ${formatMs(playheadMs)}"
+                    } else {
+                        val c = selectedClip ?: return@IconButton
+                        val cur = c.atTime(playheadMs)
+                        val kf = Keyframe(playheadMs, cur.offsetX, cur.offsetY, cur.scale, cur.rotation, cur.volume, cur.speed)
+                        project = project.copy(clips = project.clips.map { cl -> if (cl.id == c.id) cl.copy(keyframes = (cl.keyframes.filterNot { it.timeMs == playheadMs } + kf).sortedBy { it.timeMs }) else cl })
+                        repo.saveProject(project); status = "Кейфрейм ◆ ${formatMs(playheadMs)}"
+                    }
                 }) { Text("◆", color = MaterialTheme.colorScheme.primary) }
                 Text(formatMs(playheadMs) + " / " + formatMs(durationMs))
             }
@@ -617,7 +628,8 @@ fun ShapeOverlay(
             detectDragGestures(
                 onDragStart = { offset ->
                     val wPx = size.width.toFloat(); val hPx = size.height.toFloat()
-                    val hit = shapes.lastOrNull { s ->
+                    val hit = shapes.lastOrNull { s0 ->
+                        val s = s0.atTime(playheadMs)
                         !(s.endMs > 0 && (playheadMs < s.startMs || playheadMs > s.endMs)) &&
                         offset.x >= s.x * wPx && offset.x <= (s.x + s.w) * wPx && offset.y >= s.y * hPx && offset.y <= (s.y + s.h) * hPx
                     }
@@ -638,7 +650,8 @@ fun ShapeOverlay(
             )
         }
     ) {
-        shapes.forEach { s ->
+        shapes.forEach { s0 ->
+            val s = s0.atTime(playheadMs)
             if (s.endMs > 0 && (playheadMs < s.startMs || playheadMs > s.endMs)) return@forEach
             val color = Color(s.color.toInt())
             val left = s.x * size.width
@@ -671,7 +684,7 @@ fun ShapeOverlay(
                 "line" -> drawLine(color = color, start = androidx.compose.ui.geometry.Offset(left, top + h / 2f), end = androidx.compose.ui.geometry.Offset(left + w, top + h / 2f), strokeWidth = s.stroke)
                 else -> drawRoundRect(color = color, topLeft = androidx.compose.ui.geometry.Offset(left, top), size = androidx.compose.ui.geometry.Size(w, h), cornerRadius = androidx.compose.ui.geometry.CornerRadius(16f,16f), style = style)
             }
-            if (selectedId == s.id) {
+            if (selectedId == s0.id) {
                 drawRect(color = Color.White.copy(alpha = 0.8f), topLeft = androidx.compose.ui.geometry.Offset(left, top), size = androidx.compose.ui.geometry.Size(w, h), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f))
                 drawCircle(color = Color.White, radius = 10f, center = androidx.compose.ui.geometry.Offset(left + w, top + h))
             }
@@ -803,7 +816,8 @@ fun exportClip(context: Context, clip: Clip, effects: List<EffectItem>, shapes: 
                     val c = android.graphics.Canvas(bmp)
                     val p = android.graphics.Paint().apply { style = android.graphics.Paint.Style.STROKE; isAntiAlias = true }
                     val tMs = presentationTimeUs / 1000L
-                    shapes.forEach { s ->
+                    shapes.forEach { s0 ->
+                        val s = s0.atTime(tMs)
                         if (s.endMs > 0 && (tMs < s.startMs || tMs > s.endMs)) return@forEach
                         p.color = s.color.toInt(); p.strokeWidth = s.stroke * outW / 1080f
                         p.style = if (s.filled && s.type != "line") android.graphics.Paint.Style.FILL else android.graphics.Paint.Style.STROKE
@@ -894,6 +908,32 @@ fun importModelToFilesDir(context: Context, uri: Uri): File? {
         context.contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(out).use { input.copyTo(it) } } ?: return null
         out
     } catch (_: Exception) { null }
+}
+
+fun lerp(a: Float, b: Float, t: Float) = a + (b - a) * t
+
+fun Clip.atTime(ms: Long): Clip {
+    if (keyframes.isEmpty()) return this
+    val k = keyframes.sortedBy { it.timeMs }
+    if (ms <= k.first().timeMs) return copy(offsetX = k.first().offsetX, offsetY = k.first().offsetY, scale = k.first().scale, rotation = k.first().rotation, volume = k.first().volume, speed = k.first().speed)
+    if (ms >= k.last().timeMs) return copy(offsetX = k.last().offsetX, offsetY = k.last().offsetY, scale = k.last().scale, rotation = k.last().rotation, volume = k.last().volume, speed = k.last().speed)
+    val hi = k.indexOfFirst { it.timeMs >= ms }.coerceAtLeast(1)
+    val lo = hi - 1
+    val a = k[lo]; val b = k[hi]
+    val t = ((ms - a.timeMs).toFloat() / (b.timeMs - a.timeMs).coerceAtLeast(1L).toFloat()).coerceIn(0f, 1f)
+    return copy(offsetX = lerp(a.offsetX,b.offsetX,t), offsetY = lerp(a.offsetY,b.offsetY,t), scale = lerp(a.scale,b.scale,t), rotation = lerp(a.rotation,b.rotation,t), volume = lerp(a.volume,b.volume,t), speed = lerp(a.speed,b.speed,t))
+}
+
+fun ShapeItem.atTime(ms: Long): ShapeItem {
+    if (keyframes.isEmpty()) return this
+    val k = keyframes.sortedBy { it.timeMs }
+    if (ms <= k.first().timeMs) return copy(x=k.first().x,y=k.first().y,w=k.first().w,h=k.first().h)
+    if (ms >= k.last().timeMs) return copy(x=k.last().x,y=k.last().y,w=k.last().w,h=k.last().h)
+    val hi = k.indexOfFirst { it.timeMs >= ms }.coerceAtLeast(1)
+    val lo = hi - 1
+    val a = k[lo]; val b = k[hi]
+    val t = ((ms - a.timeMs).toFloat() / (b.timeMs - a.timeMs).coerceAtLeast(1L).toFloat()).coerceIn(0f, 1f)
+    return copy(x=lerp(a.x,b.x,t), y=lerp(a.y,b.y,t), w=lerp(a.w,b.w,t), h=lerp(a.h,b.h,t))
 }
 
 fun itEnd(clip: Clip, durationMs: Long): Long = if (clip.endMs > 0) clip.endMs else durationMs.coerceAtLeast(clip.startMs + 1000L)

@@ -33,6 +33,9 @@ fun Project.toXml(): String {
         serializer.attribute("", "rotation", c.rotation.toString())
         serializer.attribute("", "volume", c.volume.toString())
         serializer.attribute("", "speed", c.speed.toString())
+        c.keyframes.forEach { k ->
+            serializer.startTag("", "kf"); serializer.attribute("", "timeMs", k.timeMs.toString()); serializer.attribute("", "offsetX", k.offsetX.toString()); serializer.attribute("", "offsetY", k.offsetY.toString()); serializer.attribute("", "scale", k.scale.toString()); serializer.attribute("", "rotation", k.rotation.toString()); serializer.attribute("", "volume", k.volume.toString()); serializer.attribute("", "speed", k.speed.toString()); serializer.endTag("", "kf")
+        }
         serializer.endTag("", "clip")
     }
     effects.forEach { e ->
@@ -82,6 +85,9 @@ fun Project.toXml(): String {
         serializer.attribute("", "endMs", s.endMs.toString())
         serializer.attribute("", "groupId", s.groupId ?: "")
         serializer.attribute("", "filled", s.filled.toString())
+        s.keyframes.forEach { k ->
+            serializer.startTag("", "skf"); serializer.attribute("", "timeMs", k.timeMs.toString()); serializer.attribute("", "x", k.x.toString()); serializer.attribute("", "y", k.y.toString()); serializer.attribute("", "w", k.w.toString()); serializer.attribute("", "h", k.h.toString()); serializer.endTag("", "skf")
+        }
         serializer.endTag("", "shape")
     }
     serializer.endTag("", "project")
@@ -169,6 +175,8 @@ fun parseProjectXml(input: InputStream): Project? {
                         groupId = parser.getAttributeValue("", "groupId").let { if (it.isNullOrBlank()) null else it },
                         filled = parser.getAttributeValue("", "filled")?.toBooleanStrictOrNull() ?: false,
                     )
+                    "kf" -> if (clips.isNotEmpty()) clips[clips.lastIndex] = clips.last().copy(keyframes = clips.last().keyframes + Keyframe(parser.getAttributeValue("", "timeMs")?.toLongOrNull() ?: 0L, parser.getAttributeValue("", "offsetX")?.toFloatOrNull() ?: 0f, parser.getAttributeValue("", "offsetY")?.toFloatOrNull() ?: 0f, parser.getAttributeValue("", "scale")?.toFloatOrNull() ?: 1f, parser.getAttributeValue("", "rotation")?.toFloatOrNull() ?: 0f, parser.getAttributeValue("", "volume")?.toFloatOrNull() ?: 1f, parser.getAttributeValue("", "speed")?.toFloatOrNull() ?: 1f))
+                    "skf" -> if (shapes.isNotEmpty()) shapes[shapes.lastIndex] = shapes.last().copy(keyframes = shapes.last().keyframes + ShapeKeyframe(parser.getAttributeValue("", "timeMs")?.toLongOrNull() ?: 0L, parser.getAttributeValue("", "x")?.toFloatOrNull() ?: 0.2f, parser.getAttributeValue("", "y")?.toFloatOrNull() ?: 0.2f, parser.getAttributeValue("", "w")?.toFloatOrNull() ?: 0.3f, parser.getAttributeValue("", "h")?.toFloatOrNull() ?: 0.2f))
                 }
             }
             event = parser.next()

@@ -13,6 +13,16 @@ data class Project(
     val exportQuality: String = "high"
 )
 
+data class Keyframe(
+    val timeMs: Long,
+    val offsetX: Float = 0f,
+    val offsetY: Float = 0f,
+    val scale: Float = 1f,
+    val rotation: Float = 0f,
+    val volume: Float = 1f,
+    val speed: Float = 1f
+)
+
 data class Clip(
     val id: Long,
     val uri: String,
@@ -26,7 +36,8 @@ data class Clip(
     val scale: Float = 1f,
     val rotation: Float = 0f,
     val volume: Float = 1f,
-    val speed: Float = 1f
+    val speed: Float = 1f,
+    val keyframes: List<Keyframe> = emptyList()
 )
 
 data class EffectItem(
@@ -59,6 +70,14 @@ data class Model3DItem(
     val startMs: Long = 0L
 )
 
+data class ShapeKeyframe(
+    val timeMs: Long,
+    val x: Float,
+    val y: Float,
+    val w: Float,
+    val h: Float
+)
+
 data class ShapeItem(
     val id: Long,
     val clipId: Long,
@@ -72,5 +91,6 @@ data class ShapeItem(
     val startMs: Long = 0L,
     val endMs: Long = 0L,
     val groupId: String? = null,
-    val filled: Boolean = false
+    val filled: Boolean = false,
+    val keyframes: List<ShapeKeyframe> = emptyList()
 )
