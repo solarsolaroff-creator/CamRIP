@@ -36,16 +36,17 @@ fun AsciiKaleidoscopeBackground(modifier: Modifier = Modifier) {
         val angle = t * 0.35f
         val cosA = cos(angle); val sinA = sin(angle)
         val sym = 6
-        val slice = (2f * PI / sym).toFloat()
+        val pi2 = (2.0 * PI).toFloat()
+        val slice = pi2 / sym.toFloat()
         for (y in 0 until rows) {
             for (x in 0 until cols) {
-                var nx = (x - cols / 2f) / (cols / 2f) * 0.8f
-                var ny = (y - rows / 2f) / (rows / 2f) * 0.8f
+                val nx = (x - cols / 2f) / (cols / 2f) * 0.8f
+                val ny = (y - rows / 2f) / (rows / 2f) * 0.8f
                 val rx = nx * cosA - ny * sinA
                 val ry = nx * sinA + ny * cosA
                 val r = sqrt(rx * rx + ry * ry)
                 var a = atan2(ry, rx)
-                a = ((a % (2f * PI) + 2f * PI) % (2f * PI))
+                a = ((a % pi2) + pi2) % pi2
                 var sa = a % slice
                 if (((a / slice).toInt() % 2) == 1) sa = slice - sa
                 val px = cos(sa) * r
