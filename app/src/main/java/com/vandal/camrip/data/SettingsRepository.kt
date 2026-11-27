@@ -16,6 +16,7 @@ class SettingsRepository(private val context: Context) {
     private val fontPathKey = stringPreferencesKey("font_path")
     private val appIconKey = stringPreferencesKey("app_icon")
     private val uiStyleKey = stringPreferencesKey("ui_style")
+    private val asciiBgKey = stringPreferencesKey("ascii_bg")
 
     val quality: Flow<String> = context.settingsDataStore.data.map { it[qualityKey] ?: "1080p" }
     val theme: Flow<String> = context.settingsDataStore.data.map { it[themeKey] ?: "dark" }
@@ -23,6 +24,7 @@ class SettingsRepository(private val context: Context) {
     val fontPath: Flow<String> = context.settingsDataStore.data.map { it[fontPathKey] ?: "" }
     val appIcon: Flow<String> = context.settingsDataStore.data.map { it[appIconKey] ?: "default" }
     val uiStyle: Flow<String> = context.settingsDataStore.data.map { it[uiStyleKey] ?: "material" }
+    val asciiBg: Flow<String> = context.settingsDataStore.data.map { it[asciiBgKey] ?: "off" }
 
     suspend fun setQuality(value: String) { context.settingsDataStore.edit { it[qualityKey] = value } }
     suspend fun setTheme(value: String) { context.settingsDataStore.edit { it[themeKey] = value } }
@@ -30,6 +32,7 @@ class SettingsRepository(private val context: Context) {
     suspend fun setFontPath(value: String) { context.settingsDataStore.edit { it[fontPathKey] = value } }
     suspend fun setAppIcon(value: String) { context.settingsDataStore.edit { it[appIconKey] = value } }
     suspend fun setUiStyle(value: String) { context.settingsDataStore.edit { it[uiStyleKey] = value } }
+    suspend fun setAsciiBg(value: String) { context.settingsDataStore.edit { it[asciiBgKey] = value } }
 
     fun clearCache() {
         context.cacheDir.listFiles()?.forEach { it.deleteRecursively() }

@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.vandal.camrip.data.Project
 import com.vandal.camrip.data.ProjectRepository
+import com.vandal.camrip.data.SettingsRepository
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -28,10 +29,12 @@ fun HomeScreen(
     repo: ProjectRepository,
     onOpenProject: (Long) -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenExport: () -> Unit = {}
+    onOpenExport: () -> Unit = {},
+    settings: SettingsRepository? = null
 ) {
     var projects by remember { mutableStateOf(repo.loadProjects()) }
     LaunchedEffect(Unit) { projects = repo.loadProjects() }
+    val asciiBg by (settings?.asciiBg ?: kotlinx.coroutines.flow.flowOf("off")).collectAsState(initial = "off")
 
     Scaffold(
         topBar = {
@@ -56,6 +59,10 @@ fun HomeScreen(
             )
         }
     ) { pad ->
+        Box(Modifier.fillMaxSize()) {
+            if (asciiBg == "on") {
+                AsciiKaleidoscopeBackground(Modifier.fillMaxSize())
+            }
         if (projects.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -93,6 +100,7 @@ fun HomeScreen(
                     }
                 }
             }
+        }
         }
     }
 }

@@ -32,6 +32,7 @@ fun SettingsScreen(settings: SettingsRepository, onBack: () -> Unit) {
     val fontPath by settings.fontPath.collectAsState(initial = "")
     val appIcon by settings.appIcon.collectAsState(initial = "default")
     val uiStyle by settings.uiStyle.collectAsState(initial = "material")
+    val asciiBg by settings.asciiBg.collectAsState(initial = "off")
     var msg by remember { mutableStateOf("") }
     val accents = listOf("dynamic" to Color(0xFF6750A4), "pink" to Color(0xFFFF4FD8), "green" to Color(0xFF7CFFB2), "blue" to Color(0xFF7AA2FF), "orange" to Color(0xFFFFA94F))
     val iconOptions = listOf("default" to "Стандарт", "cam" to "Камера", "film" to "Плёнка", "neon" to "Неон")
@@ -86,6 +87,10 @@ fun SettingsScreen(settings: SettingsRepository, onBack: () -> Unit) {
                 listOf("material" to "Material", "metro" to "Metro", "kitkat" to "KitKat", "oneui" to "One UI").forEach { (key, label) ->
                     FilterChip(selected = uiStyle == key, onClick = { scope.launch { settings.setUiStyle(key) } }, label = { Text(label) })
                 }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) { Text("ASCII фон на главном экране"); Text("Анимированный калейдоскоп, по умолчанию выключен", style = MaterialTheme.typography.bodySmall) }
+                Switch(checked = asciiBg == "on", onCheckedChange = { v -> scope.launch { settings.setAsciiBg(if (v) "on" else "off") } })
             }
             Text("Цвет акцента / Material You")
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {

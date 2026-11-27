@@ -52,7 +52,8 @@ fun AppNavGraph() {
                 repo = repo,
                 onOpenProject = { id -> navController.navigate(Routes.editor(id)) },
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) },
-                onOpenExport = { navController.navigate(Routes.EXPORT) }
+                onOpenExport = { navController.navigate(Routes.EXPORT) },
+                settings = settings
             )
         }
 
