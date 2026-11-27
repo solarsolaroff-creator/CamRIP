@@ -65,7 +65,7 @@ fun HomeScreen(
         Box(Modifier.fillMaxSize()) {
             when (asciiBg) {
                 "builtin", "on" -> AsciiKaleidoscopeBackground(Modifier.fillMaxSize())
-                "url" -> if (asciiBgUrl.isNotBlank()) AndroidView(factory = { ctx -> android.webkit.WebView(ctx).apply { settings.javaScriptEnabled = true; settings.domStorageEnabled = true; setBackgroundColor(android.graphics.Color.TRANSPARENT); isClickable = false; isFocusable = false; loadUrl(asciiBgUrl) } }, update = { if (it.url != asciiBgUrl) it.loadUrl(asciiBgUrl) }, modifier = Modifier.fillMaxSize())
+                "url" -> if (asciiBgUrl.isNotBlank()) AndroidView(factory = { ctx -> android.webkit.WebView(ctx).apply { this.settings.javaScriptEnabled = true; this.settings.domStorageEnabled = true; setBackgroundColor(android.graphics.Color.TRANSPARENT); isClickable = false; isFocusable = false; loadUrl(asciiBgUrl) } }, update = { if (it.url != asciiBgUrl) it.loadUrl(asciiBgUrl) }, modifier = Modifier.fillMaxSize())
             }
         if (projects.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.Center) {

@@ -58,6 +58,8 @@ import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.Transformer
 import androidx.media3.transformer.VideoEncoderSettings
 import androidx.media3.ui.PlayerView
+import com.vandal.camrip.data.Keyframe
+import com.vandal.camrip.data.ShapeKeyframe
 import com.vandal.camrip.data.Clip
 import com.vandal.camrip.data.EffectItem
 import com.vandal.camrip.data.Model3DItem
