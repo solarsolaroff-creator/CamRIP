@@ -31,6 +31,7 @@ fun SettingsScreen(settings: SettingsRepository, onBack: () -> Unit) {
     val accent by settings.accent.collectAsState(initial = "pink")
     val fontPath by settings.fontPath.collectAsState(initial = "")
     val appIcon by settings.appIcon.collectAsState(initial = "default")
+    val uiStyle by settings.uiStyle.collectAsState(initial = "material")
     var msg by remember { mutableStateOf("") }
     val accents = listOf("dynamic" to Color(0xFF6750A4), "pink" to Color(0xFFFF4FD8), "green" to Color(0xFF7CFFB2), "blue" to Color(0xFF7AA2FF), "orange" to Color(0xFFFFA94F))
     val iconOptions = listOf("default" to "Стандарт", "cam" to "Камера", "film" to "Плёнка", "neon" to "Неон")
@@ -78,6 +79,12 @@ fun SettingsScreen(settings: SettingsRepository, onBack: () -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("dark", "light").forEach { t ->
                     FilterChip(selected = theme == t, onClick = { scope.launch { settings.setTheme(t) } }, label = { Text(t) })
+                }
+            }
+            Text("Стиль интерфейса")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                listOf("material" to "Material", "metro" to "Metro", "kitkat" to "KitKat", "oneui" to "One UI").forEach { (key, label) ->
+                    FilterChip(selected = uiStyle == key, onClick = { scope.launch { settings.setUiStyle(key) } }, label = { Text(label) })
                 }
             }
             Text("Цвет акцента / Material You")
