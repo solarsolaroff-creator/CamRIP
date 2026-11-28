@@ -162,7 +162,7 @@ fun exportClip(context: Context, clip: Clip?, effects: List<EffectItem>, shapes:
             }
             override fun onError(composition: Composition, exportResult: ExportResult, exportException: ExportException) {
                 outFile.delete()
-                if (exportException.errorCode == ExportException.ERROR_CODE_CANCELLED) onDone(false, "Экспорт отменён")
+                if (exportException.errorCodeName == "ERROR_CODE_CANCELLED") onDone(false, "Экспорт отменён")
                 else onDone(false, "Ошибка экспорта: ${exportException.errorCodeName}: ${exportException.message ?: ""}")
             }
         }).build()
