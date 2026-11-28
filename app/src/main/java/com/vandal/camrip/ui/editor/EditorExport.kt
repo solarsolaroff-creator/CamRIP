@@ -119,6 +119,7 @@ fun exportClip(context: Context, clip: Clip?, effects: List<EffectItem>, shapes:
             videoEffects += androidx.media3.effect.OverlayEffect(com.google.common.collect.ImmutableList.of<androidx.media3.effect.TextureOverlay>(overlay))
         } catch (_: Throwable) {}
     }
+    var tempBlackFile: File? = null
     val edited = if (clip != null) {
         val mediaItemBuilder = MediaItem.Builder().setUri(Uri.parse(clip.uri))
         if (clip.startMs > 0 || clip.endMs > 0) {
@@ -137,6 +138,7 @@ fun exportClip(context: Context, clip: Clip?, effects: List<EffectItem>, shapes:
             FileOutputStream(blackFile).use { compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
             recycle()
         }
+        tempBlackFile = blackFile
         val imageItem = MediaItem.Builder().setUri(Uri.fromFile(blackFile)).build()
         EditedMediaItem.Builder(imageItem).setDurationUs(3_000_000L).setFrameRate(30).setEffects(Effects(emptyList(), videoEffects)).build()
     }
@@ -157,11 +159,11 @@ fun exportClip(context: Context, clip: Clip?, effects: List<EffectItem>, shapes:
         .addListener(object : Transformer.Listener {
             override fun onCompleted(composition: Composition, exportResult: ExportResult) {
                 val ok = saveToGallery(context, outFile)
-                outFile.delete()
+                outFile.delete(); tempBlackFile?.delete()
                 onDone(ok, if (ok) "Сохранено в Movies/CamRIP" else "Не удалось сохранить в галерею")
             }
             override fun onError(composition: Composition, exportResult: ExportResult, exportException: ExportException) {
-                outFile.delete()
+                outFile.delete(); tempBlackFile?.delete()
                 if (exportException.errorCodeName == "ERROR_CODE_CANCELLED") onDone(false, "Экспорт отменён")
                 else onDone(false, "Ошибка экспорта: ${exportException.errorCodeName}: ${exportException.message ?: ""}")
             }
