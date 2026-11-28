@@ -121,14 +121,21 @@ fun exportClip(context: Context, clip: Clip?, effects: List<EffectItem>, shapes:
     }
     var tempBlackFile: File? = null
     val edited = if (clip != null) {
-        val mediaItemBuilder = MediaItem.Builder().setUri(Uri.parse(clip.uri))
-        if (clip.startMs > 0 || clip.endMs > 0) {
-            val clipBuilder = MediaItem.ClippingConfiguration.Builder().setStartPositionMs(clip.startMs.coerceAtLeast(0L))
-            if (clip.endMs > 0) clipBuilder.setEndPositionMs(clip.endMs)
-            mediaItemBuilder.setClippingConfiguration(clipBuilder.build())
+        val mime = context.contentResolver.getType(Uri.parse(clip.uri)) ?: ""
+        if (mime.startsWith("image")) {
+            val durUs = ((if (clip.endMs > 0) clip.endMs - clip.startMs else clip.durationMs).coerceAtLeast(1000L)) * 1000L
+            val imageItem = MediaItem.Builder().setUri(Uri.parse(clip.uri)).build()
+            EditedMediaItem.Builder(imageItem).setDurationUs(durUs).setFrameRate(30).setEffects(Effects(emptyList(), videoEffects)).build()
+        } else {
+            val mediaItemBuilder = MediaItem.Builder().setUri(Uri.parse(clip.uri))
+            if (clip.startMs > 0 || clip.endMs > 0) {
+                val clipBuilder = MediaItem.ClippingConfiguration.Builder().setStartPositionMs(clip.startMs.coerceAtLeast(0L))
+                if (clip.endMs > 0) clipBuilder.setEndPositionMs(clip.endMs)
+                mediaItemBuilder.setClippingConfiguration(clipBuilder.build())
+            }
+            val audioProcessors = if (clip.volume != 1f) listOf(GainAudioProcessor(clip.volume.coerceIn(0f, 100f))) else emptyList()
+            EditedMediaItem.Builder(mediaItemBuilder.build()).setEffects(Effects(audioProcessors, videoEffects)).build()
         }
-        val audioProcessors = if (clip.volume != 1f) listOf(GainAudioProcessor(clip.volume.coerceIn(0f, 100f))) else emptyList()
-        EditedMediaItem.Builder(mediaItemBuilder.build()).setEffects(Effects(audioProcessors, videoEffects)).build()
     } else {
         val outW = 1080
         val outH = (1080f / ratio).toInt().coerceAtLeast(1)

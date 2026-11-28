@@ -123,11 +123,15 @@ fun EditorScreen(
 
     val previewEffects = remember(clipEffects) { clipEffects.flatMap { it.toMedia3Effects() } }
 
-    val player = remember(selectedClip?.uri, clipEffects.map { it.id to it.type to it.intensity to it.angleZ to it.scale }) {
+    val player = remember(selectedClip?.uri, selectedClip?.durationMs, clipEffects.map { it.id to it.type to it.intensity to it.angleZ to it.scale }) {
         selectedClip?.let {
             ExoPlayer.Builder(context).build().apply {
-                setMediaItem(MediaItem.fromUri(Uri.parse(it.uri)))
-                setVideoEffects(previewEffects)
+                val mime = context.contentResolver.getType(Uri.parse(it.uri)) ?: ""
+                val mediaItem = if (mime.startsWith("image")) {
+                    MediaItem.Builder().setUri(Uri.parse(it.uri)).setImageDurationMs(it.durationMs.coerceAtLeast(1000L)).build()
+                } else MediaItem.fromUri(Uri.parse(it.uri))
+                setMediaItem(mediaItem)
+                try { setVideoEffects(previewEffects) } catch (_: Throwable) {}
                 prepare()
                 playWhenReady = false
             }
@@ -159,13 +163,30 @@ fun EditorScreen(
 
     fun saveNow() { repo.saveProject(project); project = repo.getProject(projectId) ?: project }
 
-    val pickVideo = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) {
-            val clip = Clip(id = System.currentTimeMillis(), uri = uri.toString(), label = "Клип ${project.clips.size + 1}")
-            project = project.copy(clips = project.clips + clip)
-            selectedClipId = clip.id
-            repo.saveProject(project)
-            status = "Видео добавлено"
+    val pickVideo = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { uris ->
+        if (uris.isNotEmpty()) {
+            scope.launch {
+                val newClips = withContext(Dispatchers.IO) {
+                    uris.mapIndexed { idx, uri ->
+                        val mime = context.contentResolver.getType(uri) ?: ""
+                        val isImage = mime.startsWith("image")
+                        var dur = if (isImage) 5000L else 0L
+                        if (!isImage) {
+                            try {
+                                android.media.MediaMetadataRetriever().use { mmr ->
+                                    mmr.setDataSource(context, uri)
+                                    dur = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+                                }
+                            } catch (_: Exception) {}
+                        }
+                        Clip(id = System.currentTimeMillis() + idx, uri = uri.toString(), durationMs = dur, endMs = dur, label = if (isImage) "Фото ${project.clips.size + idx + 1}" else "Клип ${project.clips.size + idx + 1}")
+                    }
+                }
+                project = project.copy(clips = project.clips + newClips)
+                selectedClipId = newClips.last().id
+                repo.saveProject(project)
+                status = "Добавлено: ${newClips.size}"
+            }
         }
     }
 
@@ -191,7 +212,7 @@ fun EditorScreen(
         ModalBottomSheet(onDismissRequest = { showSheet = false }) {
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Добавить", style = MaterialTheme.typography.titleLarge)
-                Button(onClick = { pickVideo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)); showSheet = false }, modifier = Modifier.fillMaxWidth()) { Text("Добавить видео") }
+                Button(onClick = { pickVideo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)); showSheet = false }, modifier = Modifier.fillMaxWidth()) { Text("Добавить видео/фото") }
                 Button(onClick = { selectedClip?.let { onOpenEffects(it.id) }; showSheet = false }, enabled = selectedClip != null, modifier = Modifier.fillMaxWidth()) { Text("Эффекты") }
                 Button(onClick = { pickModel.launch("*/*"); showSheet = false }, enabled = selectedClip != null, modifier = Modifier.fillMaxWidth()) { Text("Импорт 3D-модели (.glb/.gltf)") }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -272,9 +293,9 @@ fun EditorScreen(
             Box(Modifier.fillMaxWidth().weight(1f).background(Color.Black), contentAlignment = Alignment.Center) {
                 val previewRatio = when (project.aspectRatio) { "16:9" -> 16f/9f; "9:16" -> 9f/16f; "1:1" -> 1f; "4:3" -> 4f/3f; "4:5" -> 4f/5f; else -> 16f/9f }
                 Box(Modifier.aspectRatio(previewRatio).fillMaxSize()) {
+                    val clipTransform = selectedClip?.atTime(playheadMs)
+                    val agslMod = rememberAgslPreviewModifier(clipEffects.map { it.type }, clipEffects.firstOrNull()?.intensity ?: 0.5f)
                     if (player != null) {
-                        val clipTransform = selectedClip?.atTime(playheadMs)
-                        val agslMod = rememberAgslPreviewModifier(clipEffects.map { it.type }, clipEffects.firstOrNull()?.intensity ?: 0.5f)
                         Box(
                             Modifier
                                 .fillMaxSize()
@@ -308,15 +329,39 @@ fun EditorScreen(
                     } else {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Добавьте видео через +", color = Color.White) }
                     }
-                    Model3DOverlay(models = project.models3d)
-                    ShapeOverlay(shapes = clipShapes, playheadMs = playheadMs,
-                        onMove = { id, dx, dy, wPx, hPx ->
-                            project = project.copy(shapes = project.shapes.map { s -> if (s.id == id) s.copy(x = (s.x + dx / wPx).coerceIn(-0.2f, 1.2f), y = (s.y + dy / hPx).coerceIn(-0.2f, 1.2f)) else s })
-                        },
-                        onResize = { id, dx, dy, wPx, hPx ->
-                            project = project.copy(shapes = project.shapes.map { s -> if (s.id == id) s.copy(w = (s.w + dx / wPx).coerceIn(0.05f, 2f), h = (s.h + dy / hPx).coerceIn(0.05f, 2f)) else s })
-                        },
-                        onMoveEnd = { repo.saveProject(project) })
+                    Box(
+                        Modifier.fillMaxSize().graphicsLayer {
+                            translationX = clipTransform?.offsetX ?: 0f
+                            translationY = clipTransform?.offsetY ?: 0f
+                            scaleX = clipTransform?.scale ?: 1f
+                            scaleY = clipTransform?.scale ?: 1f
+                            rotationZ = clipTransform?.rotation ?: 0f
+                        }
+                    ) {
+                        Model3DOverlay(models = project.models3d)
+                        ShapeOverlay(shapes = clipShapes, playheadMs = playheadMs,
+                            onMove = { id, dx, dy, wPx, hPx ->
+                                project = project.copy(shapes = project.shapes.map { s ->
+                                    if (s.id != id) s else {
+                                        val cur = s.atTime(playheadMs)
+                                        val nx = (cur.x + dx / wPx).coerceIn(-0.2f, 1.2f); val ny = (cur.y + dy / hPx).coerceIn(-0.2f, 1.2f)
+                                        if (s.keyframes.isEmpty()) s.copy(x = nx, y = ny)
+                                        else s.copy(x = nx, y = ny, keyframes = (s.keyframes.filterNot { it.timeMs == playheadMs } + ShapeKeyframe(playheadMs, nx, ny, cur.w, cur.h)).sortedBy { it.timeMs })
+                                    }
+                                })
+                            },
+                            onResize = { id, dx, dy, wPx, hPx ->
+                                project = project.copy(shapes = project.shapes.map { s ->
+                                    if (s.id != id) s else {
+                                        val cur = s.atTime(playheadMs)
+                                        val nw = (cur.w + dx / wPx).coerceIn(0.05f, 2f); val nh = (cur.h + dy / hPx).coerceIn(0.05f, 2f)
+                                        if (s.keyframes.isEmpty()) s.copy(w = nw, h = nh)
+                                        else s.copy(w = nw, h = nh, keyframes = (s.keyframes.filterNot { it.timeMs == playheadMs } + ShapeKeyframe(playheadMs, cur.x, cur.y, nw, nh)).sortedBy { it.timeMs })
+                                    }
+                                })
+                            },
+                            onMoveEnd = { repo.saveProject(project) })
+                    }
                 }
             }
 
@@ -403,6 +448,22 @@ fun EditorScreen(
                                 val ph = playheadMs * pxPerMs * density
                                 drawLine(Color(0xFFFF4FD8), androidx.compose.ui.geometry.Offset(ph, 0f), androidx.compose.ui.geometry.Offset(ph, size.height), 4f)
                                 drawCircle(Color(0xFFFF4FD8), radius=6f, center=androidx.compose.ui.geometry.Offset(ph, 8f))
+                                fun drawDiamond(cx: Float, cy: Float, r: Float, color: Color) {
+                                    val p = androidx.compose.ui.graphics.Path().apply { moveTo(cx, cy-r); lineTo(cx+r, cy); lineTo(cx, cy+r); lineTo(cx-r, cy); close() }
+                                    drawPath(p, color)
+                                }
+                                project.clips.forEach { cl ->
+                                    cl.keyframes.forEach { kf ->
+                                        val kx = kf.timeMs * pxPerMs * density
+                                        drawDiamond(kx, 34f * density, 5f * density, Color(0xFF00E5FF))
+                                    }
+                                }
+                                project.shapes.forEach { sh ->
+                                    sh.keyframes.forEach { kf ->
+                                        val kx = kf.timeMs * pxPerMs * density
+                                        drawDiamond(kx, 126f * density, 4f * density, Color(0xFFFFD54F))
+                                    }
+                                }
                             }
                             Column(Modifier.matchParentSize().padding(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 // video track
