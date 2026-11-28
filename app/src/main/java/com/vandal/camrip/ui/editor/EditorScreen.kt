@@ -100,6 +100,7 @@ fun EditorScreen(
     var playheadMs by remember { mutableStateOf(0L) }
     var durationMs by remember { mutableStateOf(0L) }
     var exporting by remember { mutableStateOf(false) }
+    var activeTransformer by remember { mutableStateOf<Transformer?>(null) }
     var status by remember { mutableStateOf("") }
     var selectedModel3dId by remember { mutableStateOf<Long?>(null) }
     var selectedItem by remember { mutableStateOf<Pair<String, Long>?>(null) } // type,id
@@ -252,13 +253,16 @@ fun EditorScreen(
                         project = project.copy(aspectRatio = next); repo.saveProject(project)
                     }) { Text(project.aspectRatio) }
                     Button(onClick = {
-                        val clip = selectedClip ?: run { status = "Нет клипа для экспорта"; return@Button }
+                        if (exporting) {
+                            activeTransformer?.cancel(); status = "Отмена экспорта..."; return@Button
+                        }
+                        val clip = selectedClip
                         exporting = true; status = "Экспорт..."
-                        exportClip(context, clip, clipEffects, clipShapes, project.aspectRatio, project.exportQuality) { ok, msg ->
-                            exporting = false; status = msg
+                        activeTransformer = exportClip(context, clip, clipEffects, clipShapes, project.aspectRatio, project.exportQuality) { ok, msg ->
+                            exporting = false; activeTransformer = null; status = msg
                             Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                         }
-                    }, enabled = !exporting) { Text("Экспорт") }
+                    }) { Text(if (exporting) "Отмена" else "Экспорт") }
                 }
             )
         },
@@ -299,7 +303,7 @@ fun EditorScreen(
                             modifier = Modifier.fillMaxSize()
                         )
                     }
-                    Model3DOverlay(models = clipModels)
+                    Model3DOverlay(models = project.models3d)
                     ShapeOverlay(shapes = clipShapes, playheadMs = playheadMs,
                         onMove = { id, dx, dy, wPx, hPx ->
                             project = project.copy(shapes = project.shapes.map { s -> if (s.id == id) s.copy(x = (s.x + dx / wPx).coerceIn(-0.2f, 1.2f), y = (s.y + dy / hPx).coerceIn(-0.2f, 1.2f)) else s })

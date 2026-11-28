@@ -72,16 +72,16 @@ class GainAudioProcessor(private val gain: Float) : androidx.media3.common.audio
 }
 
 @androidx.annotation.OptIn(UnstableApi::class)
-fun exportClip(context: Context, clip: Clip, effects: List<EffectItem>, shapes: List<ShapeItem>, aspectRatio: String, exportQuality: String, onDone: (Boolean, String) -> Unit) {
+fun exportClip(context: Context, clip: Clip?, effects: List<EffectItem>, shapes: List<ShapeItem>, aspectRatio: String, exportQuality: String, onDone: (Boolean, String) -> Unit): Transformer? {
     val outFile = File(context.cacheDir, "export_${System.currentTimeMillis()}.mp4")
+    val ratio = when (aspectRatio) { "16:9" -> 16f/9f; "9:16" -> 9f/16f; "1:1" -> 1f; "4:3" -> 4f/3f; "4:5" -> 4f/5f; else -> 16f/9f }
     val baseEffects = mutableListOf<Effect>()
-    if (clip.scale != 1f || clip.rotation != 0f) {
+    if (clip != null && (clip.scale != 1f || clip.rotation != 0f)) {
         baseEffects += ScaleAndRotateTransformation.Builder().setScale(clip.scale.coerceAtLeast(0.1f), clip.scale.coerceAtLeast(0.1f)).setRotationDegrees(clip.rotation).build()
     }
     val videoEffects = mutableListOf<Effect>()
     videoEffects += baseEffects
     videoEffects += effects.flatMap { it.toMedia3Effects() }
-    val ratio = when (aspectRatio) { "16:9" -> 16f/9f; "9:16" -> 9f/16f; "1:1" -> 1f; "4:3" -> 4f/3f; "4:5" -> 4f/5f; else -> 16f/9f }
     videoEffects += Presentation.createForAspectRatio(ratio, Presentation.LAYOUT_SCALE_TO_FIT)
     if (shapes.isNotEmpty()) {
         try {
@@ -119,16 +119,27 @@ fun exportClip(context: Context, clip: Clip, effects: List<EffectItem>, shapes: 
             videoEffects += androidx.media3.effect.OverlayEffect(com.google.common.collect.ImmutableList.of<androidx.media3.effect.TextureOverlay>(overlay))
         } catch (_: Throwable) {}
     }
-    val mediaItemBuilder = MediaItem.Builder().setUri(Uri.parse(clip.uri))
-    if (clip.startMs > 0 || clip.endMs > 0) {
-        val clipBuilder = MediaItem.ClippingConfiguration.Builder().setStartPositionMs(clip.startMs.coerceAtLeast(0L))
-        if (clip.endMs > 0) clipBuilder.setEndPositionMs(clip.endMs)
-        mediaItemBuilder.setClippingConfiguration(clipBuilder.build())
+    val edited = if (clip != null) {
+        val mediaItemBuilder = MediaItem.Builder().setUri(Uri.parse(clip.uri))
+        if (clip.startMs > 0 || clip.endMs > 0) {
+            val clipBuilder = MediaItem.ClippingConfiguration.Builder().setStartPositionMs(clip.startMs.coerceAtLeast(0L))
+            if (clip.endMs > 0) clipBuilder.setEndPositionMs(clip.endMs)
+            mediaItemBuilder.setClippingConfiguration(clipBuilder.build())
+        }
+        val audioProcessors = if (clip.volume != 1f) listOf(GainAudioProcessor(clip.volume.coerceIn(0f, 100f))) else emptyList()
+        EditedMediaItem.Builder(mediaItemBuilder.build()).setEffects(Effects(audioProcessors, videoEffects)).build()
+    } else {
+        val outW = 1080
+        val outH = (1080f / ratio).toInt().coerceAtLeast(1)
+        val blackFile = File(context.cacheDir, "black_${System.currentTimeMillis()}.png")
+        android.graphics.Bitmap.createBitmap(outW, outH, android.graphics.Bitmap.Config.ARGB_8888).apply {
+            eraseColor(android.graphics.Color.BLACK)
+            FileOutputStream(blackFile).use { compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+            recycle()
+        }
+        val imageItem = MediaItem.Builder().setUri(Uri.fromFile(blackFile)).build()
+        EditedMediaItem.Builder(imageItem).setDurationUs(3_000_000L).setFrameRate(30).setEffects(Effects(emptyList(), videoEffects)).build()
     }
-    val audioProcessors = if (clip.volume != 1f) listOf(GainAudioProcessor(clip.volume.coerceIn(0f, 100f))) else emptyList()
-    val edited = EditedMediaItem.Builder(mediaItemBuilder.build())
-        .setEffects(Effects(audioProcessors, videoEffects))
-        .build()
     val bitrate = when (exportQuality) {
         "very_low" -> 400_000
         "low" -> 1_000_000
@@ -151,10 +162,12 @@ fun exportClip(context: Context, clip: Clip, effects: List<EffectItem>, shapes: 
             }
             override fun onError(composition: Composition, exportResult: ExportResult, exportException: ExportException) {
                 outFile.delete()
-                onDone(false, "Ошибка экспорта: ${exportException.errorCodeName}: ${exportException.message ?: ""}")
+                if (exportException.errorCode == ExportException.ERROR_CODE_CANCELLED) onDone(false, "Экспорт отменён")
+                else onDone(false, "Ошибка экспорта: ${exportException.errorCodeName}: ${exportException.message ?: ""}")
             }
         }).build()
     transformer.start(edited, outFile.absolutePath)
+    return transformer
 }
 
 fun saveToGallery(context: Context, file: File): Boolean {
