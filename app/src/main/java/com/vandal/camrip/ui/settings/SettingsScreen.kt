@@ -86,7 +86,7 @@ fun SettingsScreen(settings: SettingsRepository, onBack: () -> Unit) {
             }
             Text("Стиль интерфейса")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                listOf("material" to "Material", "metro" to "Metro", "kitkat" to "KitKat", "oneui" to "One UI").forEach { (key, label) ->
+                listOf("material" to "Material", "metro" to "Metro", "kitkat" to "KitKat", "oneui" to "One UI", "xp" to "XP").forEach { (key, label) ->
                     FilterChip(selected = uiStyle == key, onClick = { scope.launch { settings.setUiStyle(key) } }, label = { Text(label) })
                 }
             }
@@ -130,6 +130,11 @@ fun SettingsScreen(settings: SettingsRepository, onBack: () -> Unit) {
 
             HorizontalDivider()
             OutlinedButton(onClick = { settings.clearCache(); msg = "Кэш очищен" }) { Text("Очистить кэш") }
+            HorizontalDivider()
+            Text("Разработчик", style = MaterialTheme.typography.titleMedium)
+            OutlinedButton(onClick = {
+                context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://tiktok.com/@yandexmarket34")))
+            }) { Text("TikTok: @yandexmarket34") }
             if (msg.isNotBlank()) Text(msg, color = MaterialTheme.colorScheme.primary)
             Text("Аккаунты и авторизация отсутствуют. Все данные хранятся локально.", style = MaterialTheme.typography.bodySmall)
         }
