@@ -40,7 +40,7 @@ class MainActivity : ComponentActivity() {
             val themeName by settings.theme.collectAsState(initial = "dark")
             val fontPath by settings.fontPath.collectAsState(initial = "")
             val uiStyle by settings.uiStyle.collectAsState(initial = "material")
-            val dynamic = accentName == "dynamic" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && uiStyle == "material"
+            val dynamic = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && uiStyle == "material" && accentName !in listOf("green", "blue", "orange")
             val accent = when (accentName) {
                 "green" -> DesignTokens.Secondary
                 "blue" -> DesignTokens.Tertiary
