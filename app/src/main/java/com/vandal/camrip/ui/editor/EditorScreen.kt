@@ -269,39 +269,44 @@ fun EditorScreen(
         floatingActionButton = { FloatingActionButton(onClick = { showSheet = true }, shape = CircleShape) { Icon(Icons.Default.Add, contentDescription = "Добавить") } }
     ) { pad ->
         Column(Modifier.fillMaxSize().padding(pad)) {
-            Box(Modifier.fillMaxWidth().weight(1f).background(Color.Black)) {
-                if (player != null) {
-                    val clipTransform = selectedClip?.atTime(playheadMs)
-                    val agslMod = rememberAgslPreviewModifier(clipEffects.map { it.type }, clipEffects.firstOrNull()?.intensity ?: 0.5f)
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .then(agslMod)
-                            .graphicsLayer {
-                                translationX = clipTransform?.offsetX ?: 0f
-                                translationY = clipTransform?.offsetY ?: 0f
-                                scaleX = clipTransform?.scale ?: 1f
-                                scaleY = clipTransform?.scale ?: 1f
-                                rotationZ = clipTransform?.rotation ?: 0f
-                            }
-                            .pointerInput(selectedClip?.id) {
-                                detectDragGestures(
-                                    onDragEnd = { repo.saveProject(latestProject) },
-                                    onDrag = { change, dragAmount ->
-                                        change.consume()
-                                        val c = selectedClip ?: return@detectDragGestures
-                                        project = project.copy(clips = project.clips.map {
-                                            if (it.id == c.id) it.copy(offsetX = it.offsetX + dragAmount.x, offsetY = it.offsetY + dragAmount.y) else it
-                                        })
-                                    }
-                                )
-                            }
-                    ) {
-                        AndroidView(
-                            factory = { PlayerView(it).apply { this.player = player; useController = false } },
-                            update = { it.player = player },
-                            modifier = Modifier.fillMaxSize()
-                        )
+            Box(Modifier.fillMaxWidth().weight(1f).background(Color.Black), contentAlignment = Alignment.Center) {
+                val previewRatio = when (project.aspectRatio) { "16:9" -> 16f/9f; "9:16" -> 9f/16f; "1:1" -> 1f; "4:3" -> 4f/3f; "4:5" -> 4f/5f; else -> 16f/9f }
+                Box(Modifier.aspectRatio(previewRatio).fillMaxSize()) {
+                    if (player != null) {
+                        val clipTransform = selectedClip?.atTime(playheadMs)
+                        val agslMod = rememberAgslPreviewModifier(clipEffects.map { it.type }, clipEffects.firstOrNull()?.intensity ?: 0.5f)
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .then(agslMod)
+                                .graphicsLayer {
+                                    translationX = clipTransform?.offsetX ?: 0f
+                                    translationY = clipTransform?.offsetY ?: 0f
+                                    scaleX = clipTransform?.scale ?: 1f
+                                    scaleY = clipTransform?.scale ?: 1f
+                                    rotationZ = clipTransform?.rotation ?: 0f
+                                }
+                                .pointerInput(selectedClip?.id) {
+                                    detectDragGestures(
+                                        onDragEnd = { repo.saveProject(latestProject) },
+                                        onDrag = { change, dragAmount ->
+                                            change.consume()
+                                            val c = selectedClip ?: return@detectDragGestures
+                                            project = project.copy(clips = project.clips.map {
+                                                if (it.id == c.id) it.copy(offsetX = it.offsetX + dragAmount.x, offsetY = it.offsetY + dragAmount.y) else it
+                                            })
+                                        }
+                                    )
+                                }
+                        ) {
+                            AndroidView(
+                                factory = { PlayerView(it).apply { this.player = player; useController = false } },
+                                update = { it.player = player },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    } else {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Добавьте видео через +", color = Color.White) }
                     }
                     Model3DOverlay(models = project.models3d)
                     ShapeOverlay(shapes = clipShapes, playheadMs = playheadMs,
@@ -312,8 +317,6 @@ fun EditorScreen(
                             project = project.copy(shapes = project.shapes.map { s -> if (s.id == id) s.copy(w = (s.w + dx / wPx).coerceIn(0.05f, 2f), h = (s.h + dy / hPx).coerceIn(0.05f, 2f)) else s })
                         },
                         onMoveEnd = { repo.saveProject(project) })
-                } else {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Добавьте видео через +", color = Color.White) }
                 }
             }
 
